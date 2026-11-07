@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: findit-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-findit_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-findit_secret}
+      POSTGRES_DB: ${DB_NAME:-findit_db}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-findit_user} -d ${DB_NAME:-findit_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+    driver: local
