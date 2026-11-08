@@ -70,10 +70,10 @@ This document tracks every phase, step, sub-step, and task required to build **F
 #### [ ] Step 3: Clean Architecture, Connection Pooling & Gin Engine
 - **Goal:** Build the Go server foundation, connection pooling, and health endpoints.
 - **Sub-Steps:**
-  - [ ] **Step 3.1: Go Module & Dependencies**
-    - Initialize Go module `github.com/MohammedaminSa/FindIt/backend`.
-    - Install `gin-gonic/gin`, `jackc/pgx/v5`, and `joho/godotenv`.
-    - Generate `go.mod` and `go.sum`.
+  - [x] **Step 3.1: Go Module & Dependencies**
+    - [x] Initialize Go module `github.com/MohammedaminSa/FindIt/backend`.
+    - [x] Install `gin-gonic/gin`, `jackc/pgx/v5`, and `joho/godotenv`.
+    - [x] Generate `go.mod` and `go.sum`.
   - [ ] **Step 3.2: Configuration Management (`internal/config/config.go`)**
     - Create `Config` struct mapping all `.env` variables.
     - Implement safe environment loaders and default fallbacks.
