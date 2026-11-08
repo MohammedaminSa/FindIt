@@ -74,10 +74,10 @@ This document tracks every phase, step, sub-step, and task required to build **F
     - [x] Initialize Go module `github.com/MohammedaminSa/FindIt/backend`.
     - [x] Install `gin-gonic/gin`, `jackc/pgx/v5`, and `joho/godotenv`.
     - [x] Generate `go.mod` and `go.sum`.
-  - [ ] **Step 3.2: Configuration Management (`internal/config/config.go`)**
-    - Create `Config` struct mapping all `.env` variables.
-    - Implement safe environment loaders and default fallbacks.
-    - Construct `DatabaseURL()` connection DSN.
+  - [x] **Step 3.2: Configuration Management (`internal/config/config.go`)**
+    - [x] Create `Config` struct mapping all `.env` variables.
+    - [x] Implement safe environment loaders and default fallbacks.
+    - [x] Construct `DatabaseURL()` connection DSN.
   - [ ] **Step 3.3: PostgreSQL Connection Pooling (`internal/database/db.go`)**
     - Configure `pgxpool.Pool` with `MaxConns`, `MinConns`, idle/life timeouts.
     - Implement ping verification on startup.

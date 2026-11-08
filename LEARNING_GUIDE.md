@@ -16,7 +16,8 @@ Welcome to the **FindIt** learning handbook! This document is our conceptual ref
 4. [Phase 2: Go Backend Architecture](#4-phase-2-go-backend-architecture)
    - [Clean Architecture & Layered Separation](#clean-architecture--layered-separation)
    - [The Restaurant Analogy](#the-restaurant-analogy)
-   - [Step 3.1: Go Module Initialization & Core Dependencies](#step-31-go-module-initialization--core-dependencies)
+   - [Step 3.1: Go Module & Core Dependencies](#step-31-go-module--core-dependencies)
+   - [Step 3.2: Configuration Management (`internal/config`)](#step-32-configuration-management-internalconfig)
    - [High-Performance Connection Pooling (`pgxpool`)](#high-performance-connection-pooling-pgxpool)
    - [Health Check Endpoints](#health-check-endpoints)
 
@@ -190,6 +191,27 @@ backend/
 cd backend
 go mod init github.com/MohammedaminSa/FindIt/backend
 go get github.com/gin-gonic/gin github.com/jackc/pgx/v5 github.com/joho/godotenv
+```
+
+---
+
+### Step 3.2: Configuration Management (`internal/config`)
+
+#### 1. Why Do We Need a Config Package?
+- **Bad Practice:** Reading `os.Getenv("DB_PASSWORD")` in random places across the codebase. Typos happen, and missing values break the app unexpectedly.
+- **Good Practice:** Centralize all settings in a single strongly-typed `Config` struct at server startup.
+
+#### 2. Key Responsibilities of `config.go`:
+- **`godotenv.Load()`:** Automatically reads `.env` variables into application memory.
+- **Safe Fallbacks (`getEnv`, `getEnvAsInt`):** Provides default values (e.g., port `8080`, host `localhost`) if an environment variable is omitted.
+- **`DatabaseURL()`:** Safely constructs the PostgreSQL connection DSN (`postgres://user:password@host:5432/dbname?sslmode=disable`).
+
+#### 3. Verification:
+We verified this with a unit test (`internal/config/config_test.go`):
+```bash
+cd backend
+go test ./internal/config/... -v
+# Output: PASS: TestConfigLoadDefaults (0.00s)
 ```
 
 ---
