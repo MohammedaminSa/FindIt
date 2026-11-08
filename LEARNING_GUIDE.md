@@ -172,44 +172,20 @@ backend/
 
 ---
 
-### Step 3.1: Go Module Initialization & Core Dependencies
+### Step 3.1: Go Module & Core Dependencies
 
-#### 1. What is a Go Module?
-Before Go 1.11, all Go code had to live inside a single global workspace directory called `$GOPATH/src`. This made managing different dependency versions for different projects notoriously difficult.
+#### 1. What are `go.mod` and `go.sum`?
+- **`go.mod` (Project Manifest):** Like `pubspec.yaml` in Flutter or `package.json` in Node.js. It names our backend module and lists external libraries we use.
+- **`go.sum` (Security Lockfile):** Like `package-lock.json`. It saves exact cryptographic fingerprints (hashes) for each library so no one can secretly tamper with the code we download.
 
-**Go Modules** solved this:
-- A module is defined by a `go.mod` file at the root of the project.
-- It declares the module's unique canonical import path:
-  ```go
-  module github.com/MohammedaminSa/FindIt/backend
-  ```
-- Any sub-package inside the backend can now be imported cleanly from anywhere in the codebase:
-  ```go
-  import "github.com/MohammedaminSa/FindIt/backend/internal/config"
-  ```
+#### 2. The 3 Libraries We Installed & Why:
+| Library | What it is | Why we use it |
+|---|---|---|
+| **`gin`** | Web Framework | Listens for HTTP requests from Flutter, routes them to handlers, and sends JSON back. |
+| **`pgx/v5`** | PostgreSQL Driver | The fastest Go database driver. Lets Go run SQL queries and manages the connection pool. |
+| **`godotenv`** | Settings Loader | Reads secrets (DB passwords, ports) from `.env` into Go so sensitive data is never hardcoded. |
 
-#### 2. The Role of `go.mod` vs `go.sum`
-- **`go.mod` (The Manifest):** Lists the direct requirements and minimum versions of external packages needed to compile the project.
-- **`go.sum` (Cryptographic Lockfile):** Contains cryptographic SHA-256 hashes of the exact contents of each version of every downloaded dependency.
-  > [!IMPORTANT]
-  > **Why `go.sum` is critical for security:** If an attacker compromises a third-party GitHub repository and silently injects malicious code into a previously released tag, Go will detect that the checksum does not match `go.sum` and abort the build immediately, protecting the project against supply-chain tampering.
-
-#### 3. Deep-Dive: Why These 3 Foundational Packages?
-
-1. **`github.com/gin-gonic/gin` (Web Framework):**
-   - **Radix Tree Routing:** Instead of iterating through regex patterns on every HTTP request, Gin uses a compact prefix tree (Radix Tree), making route matching $O(k)$ where $k$ is URL length.
-   - **Built-in Middleware Chain:** Easy orchestration of logging, panic recovery, CORS, and authentication.
-   - **Zero Dynamic Memory Allocation during Routing:** Delivers sub-millisecond response latencies.
-
-2. **`github.com/jackc/pgx/v5` (PostgreSQL Driver & Pool):**
-   - **Why not `database/sql` with `lib/pq`?** The `lib/pq` driver is officially in maintenance mode and lacks modern PostgreSQL features. `pgx` is 2-3x faster because it communicates directly with PostgreSQL's native binary protocol rather than text formats.
-   - **Native Connection Pooling (`pgxpool`):** Provides built-in connection lifecycle management, health monitoring, and prepared statement caching without needing third-party connection managers.
-
-3. **`github.com/joho/godotenv` (Environment Loader):**
-   - Implements **The Twelve-Factor App** configuration standard.
-   - Reads `.env` key-value pairs and injects them into the running process's operating system environment variables (`os.Getenv`), allowing local development to mirror production container environments seamlessly.
-
-#### 4. Terminal Commands Used:
+#### 3. Commands Used:
 ```bash
 cd backend
 go mod init github.com/MohammedaminSa/FindIt/backend
