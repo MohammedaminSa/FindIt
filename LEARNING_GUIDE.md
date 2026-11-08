@@ -16,7 +16,8 @@ Welcome to the **FindIt** learning handbook! This document explains the core con
    - [Step 3.1: Go Module & Core Dependencies](#step-31-go-module--core-dependencies)
    - [Step 3.2: Configuration Management](#step-32-configuration-management)
    - [Step 3.3: PostgreSQL Connection Pooling (`pgxpool`)](#step-33-postgresql-connection-pooling-pgxpool)
-   - [Step 3.4 Concept: Health Check Endpoints](#step-34-concept-health-check-endpoints)
+   - [Step 3.4: Health Handler & CORS Middleware](#step-34-health-handler--cors-middleware)
+   - [Step 3.5 Concept: Server Entrypoint & Graceful Shutdown](#step-35-concept-server-entrypoint--graceful-shutdown)
 
 ---
 
@@ -139,9 +140,38 @@ flowchart LR
 
 ---
 
-### Step 3.4 Concept: Health Check Endpoints
+### Step 3.4: Health Handler & CORS Middleware
 
-* **What is it?** A `GET /api/v1/health` endpoint that checks if both the Go server and the database are running.
+* **What is it?** A monitoring probe (`GET /api/v1/health`) and cross-origin security middleware (`CORS`) built with Gin.
 * **Why do we use it?**
-  * Cloud hosts (Docker, Kubernetes, AWS) call this endpoint every few seconds to know if the service is alive and healthy.
-  * If the database goes down, the endpoint flags the system as degraded before users encounter errors.
+  1. **Uptime & Dependency Monitoring:** Cloud container platforms (Docker, Kubernetes) periodically query `/api/v1/health`. If PostgreSQL goes down, the endpoint immediately signals `503 Service Unavailable` with `status: "DEGRADED"` before end users experience runtime failures.
+  2. **Testable Abstraction (`Pinger` Interface):** Uses Go interfaces so health checks can be thoroughly tested with mocks without requiring a live database container.
+  3. **CORS for Flutter & Web:** Browsers and mobile emulators enforce Cross-Origin Resource Sharing. Our CORS middleware handles HTTP `OPTIONS` preflight requests, sets allowed headers, and enables smooth client-server communication.
+* **Key Files:**
+  * `backend/internal/handler/health.go`, `health_test.go`
+  * `backend/internal/middleware/cors.go`, `cors_test.go`
+* **Verification:**
+  ```bash
+  cd backend
+  go test ./internal/handler/... ./internal/middleware/... -v
+  # Output:
+  # === RUN   TestHealthCheck_Healthy
+  # --- PASS: TestHealthCheck_Healthy (0.00s)
+  # === RUN   TestHealthCheck_Degraded
+  # --- PASS: TestHealthCheck_Degraded (0.00s)
+  # === RUN   TestHealthCheck_NoDB
+  # --- PASS: TestHealthCheck_NoDB (0.00s)
+  # === RUN   TestCORS_PreflightOptions
+  # --- PASS: TestCORS_PreflightOptions (0.00s)
+  # === RUN   TestCORS_RegularRequest
+  # --- PASS: TestCORS_RegularRequest (0.00s)
+  # PASS
+  ```
+
+---
+
+### Step 3.5 Concept: Server Entrypoint & Graceful Shutdown
+
+* **What is it?** The main application executable (`cmd/api/main.go`) wiring configuration, connection pool, Gin router, and OS signal listener.
+* **Why do we use it?**
+  * When stopping or deploying a server, `SIGINT` or `SIGTERM` signals give running HTTP requests a grace period (e.g., 5 seconds) to finish instead of abruptly severing user requests.

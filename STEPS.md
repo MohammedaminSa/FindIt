@@ -81,9 +81,9 @@ This document tracks every phase, step, sub-step, and task required to build **F
   - [x] **Step 3.3: PostgreSQL Connection Pooling (`internal/database/db.go`)**
     - [x] Configure `pgxpool.Pool` with `MaxConns`, `MinConns`, idle/life timeouts.
     - [x] Implement ping verification on startup.
-  - [ ] **Step 3.4: Health Handler & CORS Middleware (`internal/handler/health.go`, `internal/middleware/cors.go`)**
-    - Create `GET /api/v1/health` endpoint reporting uptime and database connectivity.
-    - Add CORS middleware for mobile and web cross-origin requests.
+  - [x] **Step 3.4: Health Handler & CORS Middleware (`internal/handler/health.go`, `internal/middleware/cors.go`)**
+    - [x] Create `GET /api/v1/health` endpoint reporting uptime and database connectivity.
+    - [x] Add CORS middleware for mobile and web cross-origin requests.
   - [ ] **Step 3.5: Server Entrypoint & Graceful Shutdown (`cmd/api/main.go`)**
     - Wire config, database pool, router, and middleware.
     - Implement OS signal listener (`SIGINT`, `SIGTERM`) for zero-downtime shutdown.
