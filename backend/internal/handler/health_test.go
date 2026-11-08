@@ -120,3 +120,33 @@ func TestHealthCheck_NoDB(t *testing.T) {
 		t.Errorf("expected database service 'NOT_CONFIGURED', got '%s'", res.Services["database"])
 	}
 }
+
+func TestHealthCheck_TypedNilPointer(t *testing.T) {
+	var typedNil *mockPinger = nil
+	h := NewHealthHandler(typedNil)
+
+	router := gin.New()
+	router.GET("/api/v1/health", h.Check)
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/health", nil)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var res HealthResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &res); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if res.Status != "UP" {
+		t.Errorf("expected status 'UP', got '%s'", res.Status)
+	}
+
+	if res.Services["database"] != "NOT_CONFIGURED" {
+		t.Errorf("expected database service 'NOT_CONFIGURED', got '%s'", res.Services["database"])
+	}
+}

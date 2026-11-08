@@ -17,7 +17,7 @@ Welcome to the **FindIt** learning handbook! This document explains the core con
    - [Step 3.2: Configuration Management](#step-32-configuration-management)
    - [Step 3.3: PostgreSQL Connection Pooling (`pgxpool`)](#step-33-postgresql-connection-pooling-pgxpool)
    - [Step 3.4: Health Handler & CORS Middleware](#step-34-health-handler--cors-middleware)
-   - [Step 3.5 Concept: Server Entrypoint & Graceful Shutdown](#step-35-concept-server-entrypoint--graceful-shutdown)
+   - [Step 3.5 & 3.6: Server Entrypoint, Graceful Shutdown & Live Verification](#step-35--36-server-entrypoint-graceful-shutdown--live-verification)
 
 ---
 
@@ -170,8 +170,30 @@ flowchart LR
 
 ---
 
-### Step 3.5 Concept: Server Entrypoint & Graceful Shutdown
+### Step 3.5 & 3.6: Server Entrypoint, Graceful Shutdown & Live Verification
 
-* **What is it?** The main application executable (`cmd/api/main.go`) wiring configuration, connection pool, Gin router, and OS signal listener.
+* **What is it?** The production entrypoint (`cmd/api/main.go`) wiring the entire server together: configuration loading, connection pool initialization, Gin routing, HTTP timeout hardening, and zero-downtime shutdown signals (`SIGINT`, `SIGTERM`).
 * **Why do we use it?**
-  * When stopping or deploying a server, `SIGINT` or `SIGTERM` signals give running HTTP requests a grace period (e.g., 5 seconds) to finish instead of abruptly severing user requests.
+  1. **Zero-Downtime Graceful Shutdown:** When stopping, restarting, or deploying containers, `os.Interrupt` (`SIGINT`) or `syscall.SIGTERM` triggers `srv.Shutdown(ctx)` with a 5-second grace window. In-flight requests finish cleanly instead of disconnecting users abruptly.
+  2. **Production Timeout Hardening:** Explicitly configures `ReadTimeout` (15s), `WriteTimeout` (15s), and `IdleTimeout` (60s) on `http.Server` to protect against slowloris attacks and socket exhaustion.
+  3. **Modular & Testable Routing (`setupRouter`):** The routing setup is separated into its own function, allowing unit tests (`main_test.go`) to test endpoint routing directly via `httptest.ResponseRecorder` without binding to network ports.
+  4. **Degraded Mode Resilience:** If PostgreSQL is temporarily offline during cold boot, the server logs a warning and boots in degraded mode so monitoring and health probes remain responsive.
+* **Key Files:** `backend/cmd/api/main.go`, `cmd/api/main_test.go`.
+* **Live Verification:**
+  ```bash
+  # 1. Compile binary
+  cd backend
+  go build -o bin/api.exe ./cmd/api
+
+  # 2. Query live health check
+  curl http://localhost:8080/api/v1/health
+  # Response:
+  # {
+  #   "status": "UP",
+  #   "uptime": "5s",
+  #   "timestamp": "2026-11-08T20:19:43Z",
+  #   "services": {
+  #     "database": "NOT_CONFIGURED"
+  #   }
+  # }
+  ```

@@ -10,7 +10,7 @@ This document tracks every phase, step, sub-step, and task required to build **F
   - [x] Step 1: Git Repository, Dockerized PostgreSQL & Environment
   - [x] Step 2: Relational Database Schema, SQL Migrations & Category Seeding
 - [ ] **Phase 2: Go Backend Architecture & Security**
-  - [ ] Step 3: Clean Architecture, Connection Pooling & Gin Engine
+  - [x] Step 3: Clean Architecture, Connection Pooling & Gin Engine
   - [ ] Step 4: User Authentication & Security Layer (Bcrypt, JWT & Middleware)
 - [ ] **Phase 3: Core Domain Services (Lost & Found Features)**
   - [ ] Step 5: Category & Item Reporting APIs (Image Uploads & Location)
@@ -67,7 +67,7 @@ This document tracks every phase, step, sub-step, and task required to build **F
 
 ### Phase 2: Go Backend Architecture & Security
 
-#### [ ] Step 3: Clean Architecture, Connection Pooling & Gin Engine
+#### [x] Step 3: Clean Architecture, Connection Pooling & Gin Engine
 - **Goal:** Build the Go server foundation, connection pooling, and health endpoints.
 - **Sub-Steps:**
   - [x] **Step 3.1: Go Module & Dependencies**
@@ -84,11 +84,11 @@ This document tracks every phase, step, sub-step, and task required to build **F
   - [x] **Step 3.4: Health Handler & CORS Middleware (`internal/handler/health.go`, `internal/middleware/cors.go`)**
     - [x] Create `GET /api/v1/health` endpoint reporting uptime and database connectivity.
     - [x] Add CORS middleware for mobile and web cross-origin requests.
-  - [ ] **Step 3.5: Server Entrypoint & Graceful Shutdown (`cmd/api/main.go`)**
-    - Wire config, database pool, router, and middleware.
-    - Implement OS signal listener (`SIGINT`, `SIGTERM`) for zero-downtime shutdown.
-  - [ ] **Step 3.6: Live Verification & Testing**
-    - Compile binary and test `/api/v1/health`.
+  - [x] **Step 3.5: Server Entrypoint & Graceful Shutdown (`cmd/api/main.go`)**
+    - [x] Wire config, database pool, router, and middleware.
+    - [x] Implement OS signal listener (`SIGINT`, `SIGTERM`) for zero-downtime shutdown.
+  - [x] **Step 3.6: Live Verification & Testing**
+    - [x] Compile binary and test `/api/v1/health`.
 - **Verification:**
   ```bash
   cd backend

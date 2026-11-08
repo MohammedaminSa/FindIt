@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"net/http"
+	"reflect"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -28,6 +29,15 @@ func NewHealthHandler(db Pinger) *HealthHandler {
 	}
 }
 
+// isNilPinger safely checks if the pinger interface or its underlying concrete pointer is nil.
+func isNilPinger(p Pinger) bool {
+	if p == nil {
+		return true
+	}
+	v := reflect.ValueOf(p)
+	return v.Kind() == reflect.Ptr && v.IsNil()
+}
+
 // HealthResponse represents the structured JSON payload returned by the health endpoint.
 type HealthResponse struct {
 	Status    string            `json:"status"`
@@ -42,7 +52,7 @@ func (h *HealthHandler) Check(c *gin.Context) {
 	overallStatus := "UP"
 	httpStatusCode := http.StatusOK
 
-	if h.db != nil {
+	if !isNilPinger(h.db) {
 		// Use a dedicated 2-second timeout context for the health ping
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
 		defer cancel()
