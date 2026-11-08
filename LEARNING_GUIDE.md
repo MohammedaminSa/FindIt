@@ -15,7 +15,7 @@ Welcome to the **FindIt** learning handbook! This document explains the core con
 3. [Phase 2: Go Backend Architecture](#3-phase-2-go-backend-architecture)
    - [Step 3.1: Go Module & Core Dependencies](#step-31-go-module--core-dependencies)
    - [Step 3.2: Configuration Management](#step-32-configuration-management)
-   - [Step 3.3 Concept: Connection Pooling (`pgxpool`)](#step-33-concept-connection-pooling-pgxpool)
+   - [Step 3.3: PostgreSQL Connection Pooling (`pgxpool`)](#step-33-postgresql-connection-pooling-pgxpool)
    - [Step 3.4 Concept: Health Check Endpoints](#step-34-concept-health-check-endpoints)
 
 ---
@@ -111,15 +111,31 @@ flowchart LR
 
 ---
 
-### Step 3.3 Concept: Connection Pooling (`pgxpool`)
+### Step 3.3: PostgreSQL Connection Pooling (`pgxpool`)
 
-* **What is it?** A reusable pool of pre-opened database connections.
+* **What is it?** A high-performance, reusable pool of pre-opened database connections managed by `jackc/pgx/v5/pgxpool`.
 * **Why do we use it?**
-  * Opening a new TCP connection on every incoming HTTP request is slow and exhausts database memory.
-  * With `pgxpool`, handlers borrow a warm connection, run their query in milliseconds, and return it to the pool immediately.
-  * **Key Settings:**
-    * `MaxConns`: Maximum simultaneous connections allowed.
-    * `MinConns`: Idle connections kept warm for zero latency.
+  1. **Zero Latency Penalty:** Opening a fresh TCP and SSL handshake for every HTTP request is slow (~50-100ms) and exhausts database memory.
+  2. **Connection Reuse:** With `pgxpool`, incoming API requests borrow an already-open connection, execute SQL queries in milliseconds, and immediately return it to the pool.
+  3. **Tuned Lifecycle:**
+     * `MaxConns`: Caps maximum concurrent connections to prevent database overload under traffic spikes.
+     * `MinConns`: Keeps pre-warmed idle connections ready for instant queries.
+     * `MaxConnLifetime` & `MaxConnIdleTime`: Automatically purges and refreshes stale connections.
+  4. **Startup Validation:** Verifies database reachability via `pool.Ping()` with a strict 5-second timeout, failing fast if the database is offline.
+* **Key Files:** `backend/internal/database/db.go`, `db_test.go`.
+* **Verification:**
+  ```bash
+  cd backend
+  go test ./internal/database/... -v
+  # Output:
+  # === RUN   TestNewPoolConfig
+  # --- PASS: TestNewPoolConfig (0.00s)
+  # === RUN   TestNewPoolConfigInvalidDSN
+  # --- PASS: TestNewPoolConfigInvalidDSN (0.00s)
+  # === RUN   TestNewPoolUnreachableHost
+  # --- PASS: TestNewPoolUnreachableHost (0.01s)
+  # PASS
+  ```
 
 ---
 

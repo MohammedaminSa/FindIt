@@ -78,9 +78,9 @@ This document tracks every phase, step, sub-step, and task required to build **F
     - [x] Create `Config` struct mapping all `.env` variables.
     - [x] Implement safe environment loaders and default fallbacks.
     - [x] Construct `DatabaseURL()` connection DSN.
-  - [ ] **Step 3.3: PostgreSQL Connection Pooling (`internal/database/db.go`)**
-    - Configure `pgxpool.Pool` with `MaxConns`, `MinConns`, idle/life timeouts.
-    - Implement ping verification on startup.
+  - [x] **Step 3.3: PostgreSQL Connection Pooling (`internal/database/db.go`)**
+    - [x] Configure `pgxpool.Pool` with `MaxConns`, `MinConns`, idle/life timeouts.
+    - [x] Implement ping verification on startup.
   - [ ] **Step 3.4: Health Handler & CORS Middleware (`internal/handler/health.go`, `internal/middleware/cors.go`)**
     - Create `GET /api/v1/health` endpoint reporting uptime and database connectivity.
     - Add CORS middleware for mobile and web cross-origin requests.
