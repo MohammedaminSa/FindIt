@@ -12,6 +12,14 @@ This document tracks every phase, step, sub-step, and task required to build **F
 - [ ] **Phase 2: Go Backend Architecture & Security**
   - [x] Step 3: Clean Architecture, Connection Pooling & Gin Engine
   - [ ] Step 4: User Authentication & Security Layer (Bcrypt, JWT & Middleware)
+    - [x] Step 4.1: User Models & DTOs (`internal/models/user.go`)
+    - [x] Step 4.2: Password Hashing (`pkg/hasher/hasher.go`)
+    - [ ] Step 4.3: JWT Token Management (`pkg/token/jwt.go`)
+    - [ ] Step 4.4: User Repository (`internal/repository/user_repository.go`)
+    - [ ] Step 4.5: Auth Service (`internal/service/auth_service.go`)
+    - [ ] Step 4.6: Auth Handler & Routes (`internal/handler/auth.go`)
+    - [ ] Step 4.7: Auth Middleware (`internal/middleware/auth.go`)
+    - [ ] Step 4.8: Verification & API Testing
 - [ ] **Phase 3: Core Domain Services (Lost & Found Features)**
   - [ ] Step 5: Category & Item Reporting APIs (Image Uploads & Location)
   - [ ] Step 6: Search & Filtering Engine (PostgreSQL Full-Text Search)
@@ -100,9 +108,9 @@ This document tracks every phase, step, sub-step, and task required to build **F
 #### [ ] Step 4: User Authentication & Security Layer
 - **Goal:** Implement secure user registration, login, and JWT-guarded routes.
 - **Sub-Steps:**
-  - [ ] **Step 4.1: User Models & DTOs (`internal/models/user.go`)**
+  - [x] **Step 4.1: User Models & DTOs (`internal/models/user.go`)**
     - Define `User` model, `RegisterRequest`, `LoginRequest`, and `UserResponse`.
-  - [ ] **Step 4.2: Password Hashing (`pkg/hasher/hasher.go`)**
+  - [x] **Step 4.2: Password Hashing (`pkg/hasher/hasher.go`)**
     - Implement `HashPassword` and `CheckPasswordHash` using `golang.org/x/crypto/bcrypt`.
   - [ ] **Step 4.3: JWT Token Management (`pkg/token/jwt.go`)**
     - Implement `GenerateToken` and `ValidateToken` with HMAC-SHA256 signing.
