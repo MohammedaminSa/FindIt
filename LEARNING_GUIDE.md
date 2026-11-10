@@ -20,6 +20,7 @@ Welcome to the **FindIt** learning handbook! This document explains the core con
    - [Step 3.5 & 3.6: Server Entrypoint, Graceful Shutdown & Live Verification](#step-35--36-server-entrypoint-graceful-shutdown--live-verification)
    - [Step 4.1: User Models & DTOs](#step-41-user-models--dtos)
    - [Step 4.2: Password Hashing with Bcrypt](#step-42-password-hashing-with-bcrypt)
+   - [Step 4.3: JWT Token Management](#step-43-jwt-token-management)
 
 ---
 
@@ -225,4 +226,21 @@ flowchart LR
   ```bash
   cd backend
   go test ./pkg/hasher/... -v
+  ```
+
+---
+
+### Step 4.3: JWT Token Management
+
+* **What is it?** A cryptographic token management package (`pkg/token`) implementing signed JSON Web Tokens using HMAC-SHA256 (`github.com/golang-jwt/jwt/v5`).
+* **Why do we use it?**
+  1. **Stateless Authentication:** Avoids storing user sessions in database memory; the signed JWT payload contains user identity (`user_id`, `email`) and expiration.
+  2. **Algorithm Switching Attack Prevention:** Explicitly enforces `HS256` verification and rejects unsecure algorithms (`none` or RSA/HMAC confusion).
+  3. **Standard Claims & Timeouts:** Implements RFC 7519 registered claims (`exp`, `iat`, `nbf`, `iss`, `sub`) with configurable lifetime.
+  4. **Interface-Based Architecture:** Exposes `TokenManager` interface alongside `JWTManager` struct and convenience functions for clean dependency injection and mocking.
+* **Key Files:** `backend/pkg/token/jwt.go`, `jwt_test.go`
+* **Verification:**
+  ```bash
+  cd backend
+  go test ./pkg/token/... -v
   ```
