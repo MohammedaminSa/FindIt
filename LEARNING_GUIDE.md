@@ -21,6 +21,7 @@ Welcome to the **FindIt** learning handbook! This document explains the core con
    - [Step 4.1: User Models & DTOs](#step-41-user-models--dtos)
    - [Step 4.2: Password Hashing with Bcrypt](#step-42-password-hashing-with-bcrypt)
    - [Step 4.3: JWT Token Management](#step-43-jwt-token-management)
+   - [Step 4.4: User Repository (`pgx`)](#step-44-user-repository-pgx)
 
 ---
 
@@ -243,4 +244,21 @@ flowchart LR
   ```bash
   cd backend
   go test ./pkg/token/... -v
+  ```
+
+---
+
+### Step 4.4: User Repository (`pgx`)
+
+* **What is it?** The data access layer (`internal/repository/user_repository.go`) responsible for executing SQL queries on PostgreSQL using `pgx/v5`.
+* **Why do we use it?**
+  1. **Clean Separation of Concerns:** Business logic (in the Service layer) never writes raw SQL. The repository encapsulates all SQL queries, mapping database records to `models.User`.
+  2. **Safe Query Parameterization:** All values are passed through positional parameters (`$1, $2, ...`) eliminating SQL injection risks.
+  3. **Case-Insensitive Uniqueness & Normalization:** Emails are normalized (`LOWER(TRIM(email))`), and PostgreSQL unique constraint violations (code `23505`) are converted into typed domain errors (`ErrDuplicateEmail`).
+  4. **Interface Abstraction (`DBTX` & `UserRepository`):** High-level services depend on the `UserRepository` interface, while the concrete `PostgresUserRepository` uses a `DBTX` interface (`pgxpool.Pool` or `pgx.Tx`), making unit testing instant and mockable without requiring a running database.
+* **Key Files:** `backend/internal/repository/user_repository.go`, `user_repository_test.go`
+* **Verification:**
+  ```bash
+  cd backend
+  go test ./internal/repository/... -v
   ```
