@@ -17,7 +17,7 @@ This document tracks every phase, step, sub-step, and task required to build **F
     - [x] Step 4.3: JWT Token Management (`pkg/token/jwt.go`)
     - [x] Step 4.4: User Repository (`internal/repository/user_repository.go`)
     - [x] Step 4.5: Auth Service (`internal/service/auth_service.go`)
-    - [ ] Step 4.6: Auth Handler & Routes (`internal/handler/auth.go`)
+    - [x] Step 4.6: Auth Handler & Routes (`internal/handler/auth.go`)
     - [ ] Step 4.7: Auth Middleware (`internal/middleware/auth.go`)
     - [ ] Step 4.8: Verification & API Testing
 - [ ] **Phase 3: Core Domain Services (Lost & Found Features)**
@@ -118,7 +118,7 @@ This document tracks every phase, step, sub-step, and task required to build **F
     - Implement database queries: `CreateUser`, `GetUserByEmail`, `GetUserByID`.
   - [x] **Step 4.5: Auth Service (`internal/service/auth_service.go`)**
     - Implement registration validation, duplicate email check, login verification, token generation.
-  - [ ] **Step 4.6: Auth Handler & Routes (`internal/handler/auth.go`)**
+  - [x] **Step 4.6: Auth Handler & Routes (`internal/handler/auth.go`)**
     - Register endpoints: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`.
   - [ ] **Step 4.7: Auth Middleware (`internal/middleware/auth.go`)**
     - Intercept requests, validate `Authorization: Bearer <token>`, inject user context.

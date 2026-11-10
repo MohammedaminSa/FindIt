@@ -15,7 +15,7 @@ func init() {
 }
 
 func TestSetupRouter_HealthEndpoint(t *testing.T) {
-	router := setupRouter(nil)
+	router := setupRouter(nil, nil)
 
 	req, err := http.NewRequest(http.MethodGet, "/api/v1/health", nil)
 	if err != nil {
@@ -40,5 +40,28 @@ func TestSetupRouter_HealthEndpoint(t *testing.T) {
 
 	if res.Services["database"] != "NOT_CONFIGURED" {
 		t.Errorf("expected database service 'NOT_CONFIGURED', got '%s'", res.Services["database"])
+	}
+}
+
+func TestSetupRouter_AuthEndpointsMounted(t *testing.T) {
+	authHandler := handler.NewAuthHandler(nil)
+	router := setupRouter(nil, authHandler)
+
+	// Test that /api/v1/auth/register responds (not 404)
+	reqReg, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/register", nil)
+	wReg := httptest.NewRecorder()
+	router.ServeHTTP(wReg, reqReg)
+
+	if wReg.Code == http.StatusNotFound {
+		t.Errorf("expected /api/v1/auth/register to be mounted, got 404")
+	}
+
+	// Test that /api/v1/auth/login responds (not 404)
+	reqLogin, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", nil)
+	wLogin := httptest.NewRecorder()
+	router.ServeHTTP(wLogin, reqLogin)
+
+	if wLogin.Code == http.StatusNotFound {
+		t.Errorf("expected /api/v1/auth/login to be mounted, got 404")
 	}
 }

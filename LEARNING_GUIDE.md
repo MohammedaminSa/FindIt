@@ -23,6 +23,7 @@ Welcome to the **FindIt** learning handbook! This document explains the core con
    - [Step 4.3: JWT Token Management](#step-43-jwt-token-management)
    - [Step 4.4: User Repository (`pgx`)](#step-44-user-repository-pgx)
    - [Step 4.5: Auth Service & Business Logic](#step-45-auth-service--business-logic)
+   - [Step 4.6: Auth Handler & Routes](#step-46-auth-handler--routes)
 
 ---
 
@@ -279,4 +280,20 @@ flowchart LR
   ```bash
   cd backend
   go test ./internal/service/... -v
+  ```
+
+---
+
+### Step 4.6: Auth Handler & Routes
+
+* **What is it?** The HTTP presentation layer (`internal/handler/auth.go`) exposing `POST /api/v1/auth/register` and `POST /api/v1/auth/login` built with the Gin web framework.
+* **Why do we use it?**
+  1. **The "Waiter" of Clean Architecture:** Parses incoming JSON requests, validates payload tags (e.g. `binding:"required,email"`), invokes the auth service, and returns structured HTTP responses.
+  2. **Accurate HTTP Status Mapping:** Maps domain outcomes to proper standard status codes: `201 Created` for new users, `400 Bad Request` for schema/validation errors, `401 Unauthorized` for bad credentials, `409 Conflict` for duplicate emails, and `500 Internal Server Error` for system failures.
+  3. **Router Decoupling (`RegisterRoutes`):** Groups endpoints under `/auth` cleanly, allowing modular attachment to any Gin route group and straightforward test execution via `httptest.ResponseRecorder`.
+* **Key Files:** `backend/internal/handler/auth.go`, `auth_test.go`, `cmd/api/main.go`
+* **Verification:**
+  ```bash
+  cd backend
+  go test ./internal/handler/... -v
   ```
