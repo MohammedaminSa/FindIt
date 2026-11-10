@@ -22,6 +22,7 @@ Welcome to the **FindIt** learning handbook! This document explains the core con
    - [Step 4.2: Password Hashing with Bcrypt](#step-42-password-hashing-with-bcrypt)
    - [Step 4.3: JWT Token Management](#step-43-jwt-token-management)
    - [Step 4.4: User Repository (`pgx`)](#step-44-user-repository-pgx)
+   - [Step 4.5: Auth Service & Business Logic](#step-45-auth-service--business-logic)
 
 ---
 
@@ -261,4 +262,21 @@ flowchart LR
   ```bash
   cd backend
   go test ./internal/repository/... -v
+  ```
+
+---
+
+### Step 4.5: Auth Service & Business Logic
+
+* **What is it?** The core domain service (`internal/service/auth_service.go`) orchestrating user registration, credential verification, password hashing, and token issuance.
+* **Why do we use it?**
+  1. **The "Chef" of Clean Architecture:** Pure business rules live here. It sits between HTTP handlers (waiters) and data persistence (pantry).
+  2. **Account Enumeration Protection:** During login, identical generic error messages (`invalid email or password`) are returned regardless of whether the email exists or the password was incorrect, preventing attackers from harvesting valid emails.
+  3. **Multi-Stage Duplicate Defense:** Proactively checks email existence via `GetUserByEmail` and also catches race-condition database unique violations via `ErrDuplicateEmail`.
+  4. **Strict Interface Decoupling:** Depends only on `UserRepository` and `TokenManager` interfaces, enabling comprehensive unit testing in milliseconds with zero database or network dependencies.
+* **Key Files:** `backend/internal/service/auth_service.go`, `auth_service_test.go`
+* **Verification:**
+  ```bash
+  cd backend
+  go test ./internal/service/... -v
   ```

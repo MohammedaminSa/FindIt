@@ -16,7 +16,7 @@ This document tracks every phase, step, sub-step, and task required to build **F
     - [x] Step 4.2: Password Hashing (`pkg/hasher/hasher.go`)
     - [x] Step 4.3: JWT Token Management (`pkg/token/jwt.go`)
     - [x] Step 4.4: User Repository (`internal/repository/user_repository.go`)
-    - [ ] Step 4.5: Auth Service (`internal/service/auth_service.go`)
+    - [x] Step 4.5: Auth Service (`internal/service/auth_service.go`)
     - [ ] Step 4.6: Auth Handler & Routes (`internal/handler/auth.go`)
     - [ ] Step 4.7: Auth Middleware (`internal/middleware/auth.go`)
     - [ ] Step 4.8: Verification & API Testing
@@ -116,7 +116,7 @@ This document tracks every phase, step, sub-step, and task required to build **F
     - Implement `GenerateToken` and `ValidateToken` with HMAC-SHA256 signing.
   - [x] **Step 4.4: User Repository (`internal/repository/user_repository.go`)**
     - Implement database queries: `CreateUser`, `GetUserByEmail`, `GetUserByID`.
-  - [ ] **Step 4.5: Auth Service (`internal/service/auth_service.go`)**
+  - [x] **Step 4.5: Auth Service (`internal/service/auth_service.go`)**
     - Implement registration validation, duplicate email check, login verification, token generation.
   - [ ] **Step 4.6: Auth Handler & Routes (`internal/handler/auth.go`)**
     - Register endpoints: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`.
