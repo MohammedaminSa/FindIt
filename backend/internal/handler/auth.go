@@ -21,11 +21,17 @@ func NewAuthHandler(authService service.AuthService) *AuthHandler {
 }
 
 // RegisterRoutes registers the authentication endpoints under the provided router group.
-func (h *AuthHandler) RegisterRoutes(rg *gin.RouterGroup) {
+// An optional authMiddleware can be provided to protect the /me profile endpoint.
+func (h *AuthHandler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware ...gin.HandlerFunc) {
 	auth := rg.Group("/auth")
 	{
 		auth.POST("/register", h.Register)
 		auth.POST("/login", h.Login)
+		if len(authMiddleware) > 0 && authMiddleware[0] != nil {
+			auth.GET("/me", authMiddleware[0], h.Me)
+		} else {
+			auth.GET("/me", h.Me)
+		}
 	}
 }
 

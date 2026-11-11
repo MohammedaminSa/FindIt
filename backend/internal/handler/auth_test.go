@@ -327,4 +327,34 @@ func TestAuthHandler_Me(t *testing.T) {
 			t.Fatalf("expected HTTP 404, got %d", w.Code)
 		}
 	})
+
+	t.Run("success with auth middleware route registration", func(t *testing.T) {
+		mockSvc := &mockAuthService{
+			getUserProfileFunc: func(ctx context.Context, id uuid.UUID) (*models.UserResponse, error) {
+				return &models.UserResponse{
+					ID:    id,
+					Name:  "Charlie",
+					Email: "charlie@example.com",
+				}, nil
+			},
+		}
+
+		h := NewAuthHandler(mockSvc)
+		gin.SetMode(gin.TestMode)
+		router := gin.New()
+		v1 := router.Group("/api/v1")
+		dummyAuthMiddleware := func(c *gin.Context) {
+			c.Set("userID", userID)
+			c.Next()
+		}
+		h.RegisterRoutes(v1, dummyAuthMiddleware)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected HTTP 200, got %d: %s", w.Code, w.Body.String())
+		}
+	})
 }
