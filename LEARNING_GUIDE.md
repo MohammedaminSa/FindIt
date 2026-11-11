@@ -297,3 +297,23 @@ flowchart LR
   cd backend
   go test ./internal/handler/... -v
   ```
+
+---
+
+### Step 4.7: Auth Middleware & Protected Profile Route
+
+* **What is it?** A security interception layer (`internal/middleware/auth.go`) that validates signed JWT Bearer tokens from incoming HTTP `Authorization` headers, extracts user identities, and injects them into the Gin context before handing execution to protected endpoints like `GET /api/v1/auth/me`.
+* **Why do we use it?**
+  1. **Stateless Route Guarding:** Protects sensitive API endpoints without querying a session database on every request. Tokens are cryptographically validated in-memory via HMAC-SHA256 (`token.TokenManager`).
+  2. **Early Abort (`c.AbortWithStatusJSON`):** If the `Authorization` header is missing, malformed, unsupported (e.g., Basic), or expired, the middleware immediately aborts pipeline execution with `401 Unauthorized`, preventing unauthenticated requests from reaching downstream domain services.
+  3. **Context Propagation (`c.Set` & Safe Getters):** Extracts validated claims (`userID`, `userEmail`, `claims`) and sets them onto the Gin context. Provides typed helper functions (`GetUserID`, `GetUserEmail`, `GetClaims`) to eliminate unsafe stringly-typed context casting across handlers.
+  4. **Modular Middleware Injection:** Handlers and routers can accept `authMiddleware` via clean dependency injection, making unit testing instant with mock tokens or simulated contexts.
+* **Key Files:**
+  * `backend/internal/middleware/auth.go`, `auth_test.go`
+  * `backend/internal/handler/auth.go`, `auth_test.go`
+  * `backend/cmd/api/main.go`, `cmd/api/main_test.go`
+* **Verification:**
+  ```bash
+  cd backend
+  go test ./internal/middleware/... ./internal/handler/... ./cmd/api/... -v
+  ```
