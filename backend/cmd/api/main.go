@@ -23,7 +23,7 @@ import (
 )
 
 // setupRouter initializes the Gin engine with all global middlewares and v1 API routes.
-func setupRouter(db handler.Pinger, authHandler *handler.AuthHandler, authMiddleware ...gin.HandlerFunc) *gin.Engine {
+func setupRouter(db handler.Pinger, authHandler *handler.AuthHandler, categoryHandler *handler.CategoryHandler, authMiddleware ...gin.HandlerFunc) *gin.Engine {
 	router := gin.New()
 
 	// Global Middlewares
@@ -45,6 +45,9 @@ func setupRouter(db handler.Pinger, authHandler *handler.AuthHandler, authMiddle
 		v1.GET("/health", healthHandler.Check)
 		if authHandler != nil {
 			authHandler.RegisterRoutes(v1, authMw)
+		}
+		if categoryHandler != nil {
+			categoryHandler.RegisterRoutes(v1)
 		}
 	}
 
@@ -91,7 +94,11 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService)
 	authMiddleware := middleware.Auth(jwtManager)
 
-	router := setupRouter(pinger, authHandler, authMiddleware)
+	categoryRepo := repository.NewCategoryRepository(dbPool)
+	categoryService := service.NewCategoryService(categoryRepo)
+	categoryHandler := handler.NewCategoryHandler(categoryService)
+
+	router := setupRouter(pinger, authHandler, categoryHandler, authMiddleware)
 
 	// 4. Configure HTTP server with production-ready timeouts
 	serverAddr := fmt.Sprintf(":%s", cfg.ServerPort)

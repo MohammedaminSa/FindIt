@@ -26,6 +26,8 @@ Welcome to the **FindIt** learning handbook! This document explains the core con
    - [Step 4.6: Auth Handler & Routes](#step-46-auth-handler--routes)
    - [Step 4.7: Auth Middleware & Protected Profile Route](#step-47-auth-middleware--protected-profile-route)
    - [Step 4.8: Verification & End-to-End API Testing](#step-48-verification--end-to-end-api-testing)
+4. [Phase 3: Core Domain Services (Lost & Found Features)](#4-phase-3-core-domain-services-lost--found-features)
+   - [Step 5.1: Categories API & Domain Service](#step-51-categories-api--domain-service)
 
 ---
 
@@ -338,4 +340,32 @@ flowchart LR
   cd backend
   go test -v ./cmd/api
   ```
+
+---
+
+## 4. Phase 3: Core Domain Services (Lost & Found Features)
+
+### Step 5.1: Categories API & Domain Service
+
+* **What is it?** A complete domain vertical (`Category` model, `CategoryRepository`, `CategoryService`, and `CategoryHandler`) providing `GET /api/v1/categories` and `GET /api/v1/categories/:id` so mobile clients can fetch active lost & found categories (e.g., Electronics, Keys, Pets) with their icons and database IDs.
+* **Why do we use it?**
+  1. **Dynamic Category Discovery:** Instead of hardcoding categories in Flutter, mobile clients fetch them dynamically from `/api/v1/categories`. When new categories are added in PostgreSQL, mobile apps receive them immediately.
+  2. **Clean Layered Separation:**
+     - **Model (`internal/models/category.go`):** Defines `Category` and the public `CategoryResponse` DTO with conversion helpers (`ToResponse`, `ToCategoryResponseList`).
+     - **Repository (`internal/repository/category_repository.go`):** Executes optimized SQL queries (`SELECT id, name, icon, created_at FROM categories ORDER BY id ASC`) via the `DBTX` interface.
+     - **Service (`internal/service/category_service.go`):** Enforces business rules and validation (e.g., validating category IDs > 0).
+     - **Handler (`internal/handler/category.go`):** Binds HTTP requests, parses route parameters (`:id`), handles 400 Bad Request, 404 Not Found, and 500 Internal Server Error, and returns clean JSON.
+  3. **Zero-Alloc Nil-Safe Lists:** Ensures an empty list is marshaled as `[]` instead of `null` so JSON parsers in Flutter/mobile never encounter null pointer exceptions.
+* **Key Files:**
+  * `backend/internal/models/category.go`, `category_test.go`
+  * `backend/internal/repository/category_repository.go`, `category_repository_test.go`
+  * `backend/internal/service/category_service.go`, `category_service_test.go`
+  * `backend/internal/handler/category.go`, `category_test.go`
+  * `backend/cmd/api/category_integration_test.go`
+* **Verification:**
+  ```bash
+  cd backend
+  go test -v ./internal/models/... ./internal/repository/... ./internal/service/... ./internal/handler/... ./cmd/api/...
+  ```
+
 

@@ -100,7 +100,7 @@ func setupIntegrationServer(t *testing.T) (*gin.Engine, *inMemoryUserRepo, token
 	authHandler := handler.NewAuthHandler(authService)
 	authMw := middleware.Auth(jwtMgr)
 
-	router := setupRouter(nil, authHandler, authMw)
+	router := setupRouter(nil, authHandler, nil, authMw)
 	return router, repo, jwtMgr
 }
 

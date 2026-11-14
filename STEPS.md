@@ -22,6 +22,11 @@ This document tracks every phase, step, sub-step, and task required to build **F
     - [x] Step 4.8: Verification & API Testing
 - [ ] **Phase 3: Core Domain Services (Lost & Found Features)**
   - [ ] Step 5: Category & Item Reporting APIs (Image Uploads & Location)
+    - [x] Step 5.1: Categories API (`GET /api/v1/categories`)
+    - [ ] Step 5.2: Item Domain Models (`internal/models/item.go`)
+    - [ ] Step 5.3: Image Upload Service (`internal/service/upload_service.go`)
+    - [ ] Step 5.4: Item Repository & Service (`internal/repository/item_repository.go`, `internal/service/item_service.go`)
+    - [ ] Step 5.5: Item Endpoints (`POST /api/v1/items`, `GET /api/v1/items/:id`)
   - [ ] Step 6: Search & Filtering Engine (PostgreSQL Full-Text Search)
   - [ ] Step 7: Ownership Claims Lifecycle & Verification Workflow
   - [ ] Step 8: In-App Messaging & Notifications
@@ -142,8 +147,12 @@ This document tracks every phase, step, sub-step, and task required to build **F
 #### [ ] Step 5: Category & Item Reporting APIs
 - **Goal:** Allow users to browse categories and post lost or found items with images.
 - **Sub-Steps:**
-  - [ ] **Step 5.1: Categories API (`GET /api/v1/categories`)**
-    - Handler, service, and repository to list active categories.
+  - [x] **Step 5.1: Categories API (`GET /api/v1/categories`, `GET /api/v1/categories/:id`)**
+    - Domain model & DTOs (`internal/models/category.go`)
+    - Database repository with interface & tests (`internal/repository/category_repository.go`)
+    - Business service layer (`internal/service/category_service.go`)
+    - HTTP handler & router registration (`internal/handler/category.go`)
+    - End-to-end integration tests (`cmd/api/category_integration_test.go`)
   - [ ] **Step 5.2: Item Domain Models (`internal/models/item.go`)**
     - Define `Item`, `CreateItemRequest`, `ItemResponse`, status/type enums.
   - [ ] **Step 5.3: Image Upload Service (`internal/service/upload_service.go`)**
@@ -155,7 +164,8 @@ This document tracks every phase, step, sub-step, and task required to build **F
 - **Verification:**
   ```bash
   curl http://localhost:8080/api/v1/categories
-  curl -X POST http://localhost:8080/api/v1/items -H "Authorization: Bearer <TOKEN>" -F "title=Lost iPhone 14" -F "type=LOST" -F "category_id=<UUID>"
+  curl http://localhost:8080/api/v1/categories/1
+  curl -X POST http://localhost:8080/api/v1/items -H "Authorization: Bearer <TOKEN>" -F "title=Lost iPhone 14" -F "type=LOST" -F "category_id=1"
   ```
 
 #### [ ] Step 6: High-Performance Search & Filtering Engine

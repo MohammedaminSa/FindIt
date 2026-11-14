@@ -969,6 +969,46 @@ type AuthResponse struct {
 
 ---
 
+### Category Models - `internal/models/category.go`
+
+#### Purpose
+
+Defines the structure for item classifications (e.g., Electronics, Keys, Bags) and safe public response payloads.
+
+#### `Category` Struct (Database Model)
+
+```go
+type Category struct {
+    ID        int64     `json:"id" db:"id"`
+    Name      string    `json:"name" db:"name"`
+    Icon      string    `json:"icon" db:"icon"`
+    CreatedAt time.Time `json:"created_at" db:"created_at"`
+}
+```
+
+- `ID`: Auto-incrementing integer primary key (`SERIAL` in PostgreSQL).
+- `Name`: Unique category label (e.g. `"Electronics"`).
+- `Icon`: Material icon identifier used by Flutter (e.g. `"devices"`).
+- `CreatedAt`: Database timestamp.
+
+#### `CategoryResponse` (Public Output DTO)
+
+```go
+type CategoryResponse struct {
+    ID        int64     `json:"id"`
+    Name      string    `json:"name"`
+    Icon      string    `json:"icon"`
+    CreatedAt time.Time `json:"created_at"`
+}
+```
+
+#### Helper Functions
+
+- `ToResponse()`: Safely converts a `Category` to `*CategoryResponse`, returning `nil` if the receiver pointer is `nil`.
+- `ToCategoryResponseList(categories)`: Converts a slice of entities to response DTOs, guaranteeing a non-nil empty slice `[]CategoryResponse{}` so JSON encoders emit `[]` rather than `null`.
+
+---
+
 ## Security Packages
 
 ### Password Hashing - `pkg/hasher/hasher.go`
@@ -2025,6 +2065,34 @@ Same error handling as GetUserByEmail.
 
 ---
 
+### Category Repository - `internal/repository/category_repository.go`
+
+#### Purpose
+
+Handles database persistence and queries for the categories table using `DBTX`.
+
+#### Interface
+
+```go
+type CategoryRepository interface {
+    GetAllCategories(ctx context.Context) ([]models.Category, error)
+    GetCategoryByID(ctx context.Context, id int64) (*models.Category, error)
+}
+```
+
+#### Key Methods
+
+1. **`GetAllCategories(ctx)`**:
+   - Queries `SELECT id, name, icon, created_at FROM categories ORDER BY id ASC`.
+   - Iterates through `pgx.Rows`, scans into `models.Category`, and handles error checking (`rows.Err()`).
+   - Ensures an empty slice is returned when no rows are found.
+
+2. **`GetCategoryByID(ctx, id)`**:
+   - Executes parameterized query `WHERE id = $1`.
+   - Translates `pgx.ErrNoRows` into `ErrCategoryNotFound`.
+
+---
+
 ## Service Layer
 
 **File:** `internal/service/auth_service.go`
@@ -2527,9 +2595,33 @@ func (s *DefaultAuthService) GetUserProfile(ctx context.Context, userID uuid.UUI
 
 ---
 
-*Continuing with Handler Layer, Middleware Layer, and Main Application...*
+### Category Service - `internal/service/category_service.go`
 
-Let me know if you want me to continue with the remaining sections!
+#### Purpose
+
+Encapsulates business rules and validations for category operations.
+
+#### Interface
+
+```go
+type CategoryService interface {
+    GetAllCategories(ctx context.Context) ([]models.CategoryResponse, error)
+    GetCategoryByID(ctx context.Context, id int64) (*models.CategoryResponse, error)
+}
+```
+
+#### Key Methods
+
+1. **`GetAllCategories(ctx)`**:
+   - Calls repository `GetAllCategories(ctx)`.
+   - Maps raw database entities into public DTOs via `models.ToCategoryResponseList()`.
+
+2. **`GetCategoryByID(ctx, id)`**:
+   - Validates that `id > 0`. If `id <= 0`, returns `ErrInvalidCategoryID` without hitting the database.
+   - Calls repository `GetCategoryByID(ctx, id)`.
+   - Converts the entity to a public `CategoryResponse`.
+
+---
 
 ## Handler Layer
 
@@ -3037,6 +3129,35 @@ fmt.Println(userID.String())  // ✓ Works
 - **Thin handlers**: Logic in service, coordination in handler
 - **Error mapping**: Service errors → HTTP statuses
 - **Validation**: Early rejection of bad input
+
+---
+
+### Category Handler - `internal/handler/category.go`
+
+#### Purpose
+
+Handles incoming HTTP requests for category resources, registers routes under `/api/v1/categories`, validates path parameters, and formats JSON outputs.
+
+#### Routes Registered
+
+| Method | Endpoint | Handler Method | Auth Required | Description |
+|--------|----------|----------------|---------------|-------------|
+| `GET` | `/api/v1/categories` | `GetAll` | No | Lists all categories |
+| `GET` | `/api/v1/categories/:id` | `GetByID` | No | Fetches a single category by ID |
+
+#### Key Methods
+
+1. **`GetAll(c *gin.Context)`**:
+   - Calls `categoryService.GetAllCategories(c.Request.Context())`.
+   - On error: returns `500 Internal Server Error` with `{"error": "Failed to retrieve categories"}`.
+   - On success: returns `200 OK` with JSON array of categories.
+
+2. **`GetByID(c *gin.Context)`**:
+   - Parses `:id` route parameter via `strconv.ParseInt(idStr, 10, 64)`.
+   - Rejects non-numeric or non-positive IDs with `400 Bad Request` (`{"error": "Invalid category ID"}`).
+   - Calls `categoryService.GetCategoryByID(...)`.
+   - Maps `ErrCategoryNotFound` to `404 Not Found` (`{"error": "Category not found"}`).
+   - On success: returns `200 OK` with the category object.
 
 ---
 
@@ -3557,12 +3678,13 @@ import (
 #### setupRouter Function
 
 ```go
-func setupRouter(db handler.Pinger, authHandler *handler.AuthHandler, authMiddleware ...gin.HandlerFunc) *gin.Engine {
+func setupRouter(db handler.Pinger, authHandler *handler.AuthHandler, categoryHandler *handler.CategoryHandler, authMiddleware ...gin.HandlerFunc) *gin.Engine {
 ```
 
 **Router factory:**
 - `db handler.Pinger`: For health checks
 - `authHandler`: Auth endpoints
+- `categoryHandler`: Category endpoints
 - `authMiddleware`: JWT validation middleware
 - Returns: Configured Gin engine
 
@@ -3625,6 +3747,9 @@ Request → Logger → Recovery → CORS → Route Handler
         v1.GET("/health", healthHandler.Check)
         if authHandler != nil {
             authHandler.RegisterRoutes(v1, authMw)
+        }
+        if categoryHandler != nil {
+            categoryHandler.RegisterRoutes(v1)
         }
     }
 ```
@@ -4126,6 +4251,24 @@ func TestAuth_EndToEndLifecycle(t *testing.T) {
 3. ✅ JWT generation, header parsing, and token verification
 4. ✅ Authorization header extraction and context injection
 5. ✅ Status code mappings (201, 200, 400, 401, 409)
+
+#### Categories API Integration Test: `cmd/api/category_integration_test.go`
+
+```go
+func TestCategoryAPI_Integration(t *testing.T) {
+    // 1. Setup in-memory repository with 9 seeded default categories
+    // 2. GET /api/v1/categories -> returns 200 OK with all 9 categories
+    // 3. GET /api/v1/categories/1 -> returns 200 OK with Electronics
+    // 4. GET /api/v1/categories/999 -> returns 404 Not Found
+    // 5. GET /api/v1/categories/abc & /0 -> returns 400 Bad Request
+}
+```
+
+**What's tested:**
+1. ✅ Complete categories HTTP route mounting
+2. ✅ JSON list serialization and empty array guarantees
+3. ✅ Path parameter parsing and numeric ID validation
+4. ✅ 404 error translation when category does not exist
 
 ### Running Tests
 

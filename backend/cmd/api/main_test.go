@@ -18,7 +18,7 @@ func init() {
 }
 
 func TestSetupRouter_HealthEndpoint(t *testing.T) {
-	router := setupRouter(nil, nil)
+	router := setupRouter(nil, nil, nil)
 
 	req, err := http.NewRequest(http.MethodGet, "/api/v1/health", nil)
 	if err != nil {
@@ -53,7 +53,7 @@ func TestSetupRouter_AuthEndpointsMounted(t *testing.T) {
 	}
 	authMw := middleware.Auth(jwtMgr)
 	authHandler := handler.NewAuthHandler(nil)
-	router := setupRouter(nil, authHandler, authMw)
+	router := setupRouter(nil, authHandler, nil, authMw)
 
 	// Test that /api/v1/auth/register responds (not 404)
 	reqReg, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/register", nil)
@@ -80,5 +80,19 @@ func TestSetupRouter_AuthEndpointsMounted(t *testing.T) {
 
 	if wMe.Code != http.StatusUnauthorized {
 		t.Errorf("expected /api/v1/auth/me to return 401 without auth header, got %d", wMe.Code)
+	}
+}
+
+func TestSetupRouter_CategoryEndpointsMounted(t *testing.T) {
+	categoryHandler := handler.NewCategoryHandler(nil)
+	router := setupRouter(nil, nil, categoryHandler)
+
+	// Test that /api/v1/categories is mounted (not 404)
+	reqCategories, _ := http.NewRequest(http.MethodGet, "/api/v1/categories", nil)
+	wCategories := httptest.NewRecorder()
+	router.ServeHTTP(wCategories, reqCategories)
+
+	if wCategories.Code == http.StatusNotFound {
+		t.Errorf("expected /api/v1/categories to be mounted, got 404")
 	}
 }
