@@ -24,6 +24,8 @@ Welcome to the **FindIt** learning handbook! This document explains the core con
    - [Step 4.4: User Repository (`pgx`)](#step-44-user-repository-pgx)
    - [Step 4.5: Auth Service & Business Logic](#step-45-auth-service--business-logic)
    - [Step 4.6: Auth Handler & Routes](#step-46-auth-handler--routes)
+   - [Step 4.7: Auth Middleware & Protected Profile Route](#step-47-auth-middleware--protected-profile-route)
+   - [Step 4.8: Verification & End-to-End API Testing](#step-48-verification--end-to-end-api-testing)
 
 ---
 
@@ -317,3 +319,23 @@ flowchart LR
   cd backend
   go test ./internal/middleware/... ./internal/handler/... ./cmd/api/... -v
   ```
+
+---
+
+### Step 4.8: Verification & End-to-End API Testing
+
+* **What is it?** Full HTTP integration testing (`cmd/api/auth_integration_test.go`) that simulates real client requests across the entire application stack: routing, middlewares (CORS, Logger, Recovery, Auth), handlers, services, password hashing, and token generation.
+* **Why do we use it?**
+  1. **Closing the Loop:** Unit tests verify isolated functions (e.g., token parsing in isolation), but integration tests verify that all the layers work in concert—from raw HTTP JSON payload parsing to JWT verification and status code mapping.
+  2. **Lifecycle Confidence:** Tests the complete user lifecycle in a single test flow: `POST /api/v1/auth/register` (receives token) ➔ `POST /api/v1/auth/login` (receives new token) ➔ `GET /api/v1/auth/me` with `Bearer <token>` (fetches correct profile).
+  3. **Security Boundary Enforcement:** Proves that protected routes reject unauthorized requests without tokens, malformed headers, foreign signing keys, and expired tokens with strict `401 Unauthorized` responses.
+  4. **Fast, Zero-Dependency CI:** Uses a thread-safe in-memory repository to execute complete end-to-end HTTP tests in milliseconds without requiring external Docker services or databases to be online.
+* **Key Files:**
+  * `backend/cmd/api/auth_integration_test.go`
+  * `backend/cmd/api/main.go`
+* **Verification:**
+  ```bash
+  cd backend
+  go test -v ./cmd/api
+  ```
+

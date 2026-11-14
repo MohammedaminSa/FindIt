@@ -4105,6 +4105,28 @@ func TestAuthHandler_Register(t *testing.T) {
 3. ✅ Returns 201 status
 4. ✅ Returns expected JSON format
 
+#### End-to-End API Integration Test: `cmd/api/auth_integration_test.go`
+
+```go
+func TestAuth_EndToEndLifecycle(t *testing.T) {
+    // 1. Setup full router with in-memory repository, real bcrypt, and JWT manager
+    router, _, _ := setupIntegrationServer(t)
+
+    // 2. Register: POST /api/v1/auth/register -> 201 Created
+    // 3. Login: POST /api/v1/auth/login -> 200 OK + JWT
+    // 4. Authenticated Request: GET /api/v1/auth/me with Bearer <token> -> 200 OK
+    // 5. Duplicate conflict: POST /api/v1/auth/register -> 409 Conflict
+    // 6. Bad credentials: POST /api/v1/auth/login -> 401 Unauthorized
+}
+```
+
+**What's tested:**
+1. ✅ Full HTTP request pipeline (CORS, Logger, Recovery, Auth middleware)
+2. ✅ Password hashing on registration and verification on login
+3. ✅ JWT generation, header parsing, and token verification
+4. ✅ Authorization header extraction and context injection
+5. ✅ Status code mappings (201, 200, 400, 401, 409)
+
 ### Running Tests
 
 ```bash

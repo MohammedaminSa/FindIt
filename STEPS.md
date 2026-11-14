@@ -9,9 +9,9 @@ This document tracks every phase, step, sub-step, and task required to build **F
 - [x] **Phase 1: Environment & Database Foundation**
   - [x] Step 1: Git Repository, Dockerized PostgreSQL & Environment
   - [x] Step 2: Relational Database Schema, SQL Migrations & Category Seeding
-- [ ] **Phase 2: Go Backend Architecture & Security**
+- [x] **Phase 2: Go Backend Architecture & Security**
   - [x] Step 3: Clean Architecture, Connection Pooling & Gin Engine
-  - [ ] Step 4: User Authentication & Security Layer (Bcrypt, JWT & Middleware)
+  - [x] Step 4: User Authentication & Security Layer (Bcrypt, JWT & Middleware)
     - [x] Step 4.1: User Models & DTOs (`internal/models/user.go`)
     - [x] Step 4.2: Password Hashing (`pkg/hasher/hasher.go`)
     - [x] Step 4.3: JWT Token Management (`pkg/token/jwt.go`)
@@ -19,7 +19,7 @@ This document tracks every phase, step, sub-step, and task required to build **F
     - [x] Step 4.5: Auth Service (`internal/service/auth_service.go`)
     - [x] Step 4.6: Auth Handler & Routes (`internal/handler/auth.go`)
     - [x] Step 4.7: Auth Middleware (`internal/middleware/auth.go`)
-    - [ ] Step 4.8: Verification & API Testing
+    - [x] Step 4.8: Verification & API Testing
 - [ ] **Phase 3: Core Domain Services (Lost & Found Features)**
   - [ ] Step 5: Category & Item Reporting APIs (Image Uploads & Location)
   - [ ] Step 6: Search & Filtering Engine (PostgreSQL Full-Text Search)
@@ -105,7 +105,7 @@ This document tracks every phase, step, sub-step, and task required to build **F
   curl http://localhost:8080/api/v1/health
   ```
 
-#### [ ] Step 4: User Authentication & Security Layer
+#### [x] Step 4: User Authentication & Security Layer
 - **Goal:** Implement secure user registration, login, and JWT-guarded routes.
 - **Sub-Steps:**
   - [x] **Step 4.1: User Models & DTOs (`internal/models/user.go`)**
@@ -123,7 +123,8 @@ This document tracks every phase, step, sub-step, and task required to build **F
   - [x] **Step 4.7: Auth Middleware (`internal/middleware/auth.go`)**
     - Intercept requests, validate `Authorization: Bearer <token>`, inject user context.
     - Add protected route: `GET /api/v1/auth/me`.
-  - [ ] **Step 4.8: Verification & API Testing**
+  - [x] **Step 4.8: Verification & API Testing (`cmd/api/auth_integration_test.go`)**
+    - Automated end-to-end integration tests covering registration, login, Bearer token profile retrieval, input validation, and route protection.
 - **Verification:**
   ```bash
   # Register
