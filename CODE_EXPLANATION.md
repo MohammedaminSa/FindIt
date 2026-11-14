@@ -14,10 +14,18 @@
 4. [Configuration Layer](#configuration-layer)
 5. [Database Layer](#database-layer)
 6. [Models Layer](#models-layer)
+   - [User Models (`internal/models/user.go`)](#user-struct-database-model)
+   - [Category Models (`internal/models/category.go`)](#category-models---internalmodelscategorygo)
 7. [Security Packages](#security-packages)
 8. [Repository Layer](#repository-layer)
+   - [User Repository (`internal/repository/user_repository.go`)](#repository-layer)
+   - [Category Repository (`internal/repository/category_repository.go`)](#category-repository---internalrepositorycategory_repositorygo)
 9. [Service Layer](#service-layer)
+   - [Auth Service (`internal/service/auth_service.go`)](#service-layer)
+   - [Category Service (`internal/service/category_service.go`)](#category-service---internalservicecategory_servicego)
 10. [Handler Layer](#handler-layer)
+    - [Auth Handler (`internal/handler/auth.go`)](#handler-layer)
+    - [Category Handler (`internal/handler/category.go`)](#category-handler---internalhandlercategorygo)
 11. [Middleware Layer](#middleware-layer)
 12. [Main Application](#main-application)
 13. [Testing Explained](#testing-explained)
@@ -973,9 +981,25 @@ type AuthResponse struct {
 
 #### Purpose
 
-Defines the structure for item classifications (e.g., Electronics, Keys, Bags) and safe public response payloads.
+Defines the structure for item classifications (e.g., Electronics, Keys, Wallets, Pets) and public response payloads so mobile clients can discover categories dynamically.
 
-#### `Category` Struct (Database Model)
+#### Architecture Flow
+
+```
+PostgreSQL (categories table) ➔ Category Model (internal) ➔ CategoryResponse DTO (API) ➔ Flutter App
+```
+
+#### Line-by-Line Explanation
+
+```go
+package models
+
+import "time"
+```
+- `package models`: All domain models and DTOs live in this package.
+- `import "time"`: Standard library package needed for timestamps (`time.Time`).
+
+##### `Category` Struct (Database Model)
 
 ```go
 type Category struct {
@@ -986,12 +1010,19 @@ type Category struct {
 }
 ```
 
-- `ID`: Auto-incrementing integer primary key (`SERIAL` in PostgreSQL).
-- `Name`: Unique category label (e.g. `"Electronics"`).
-- `Icon`: Material icon identifier used by Flutter (e.g. `"devices"`).
-- `CreatedAt`: Database timestamp.
+**Field Breakdown:**
+| Field | Type | Description |
+|---|---|---|
+| `ID` | `int64` | Primary key mapped from PostgreSQL `SERIAL` (auto-incrementing integer). We use `int64` in Go to safely handle large IDs without 32-bit integer overflow. |
+| `Name` | `string` | The display name of the category (e.g., `"Electronics"`, `"Keys"`). Unique in PostgreSQL. |
+| `Icon` | `string` | The Material Design icon name (e.g., `"devices"`, `"vpn_key"`), used by Flutter to render category icons in the UI. |
+| `CreatedAt` | `time.Time` | UTC timestamp recorded when the category was inserted into the database. |
 
-#### `CategoryResponse` (Public Output DTO)
+**Struct Tags Breakdown:**
+- `json:"id"`: Serializes to lowercase `"id"` in API responses.
+- `db:"id"`: Explicit mapping for database columns if an ORM or struct scanner reads it.
+
+##### `CategoryResponse` Struct (Output DTO)
 
 ```go
 type CategoryResponse struct {
@@ -1002,10 +1033,50 @@ type CategoryResponse struct {
 }
 ```
 
-#### Helper Functions
+**Why separate DTO from the database Model?**
+- Decouples internal database schemas from external API contracts.
+- Allows fields to be added, renamed, or omitted internally without breaking mobile clients.
 
-- `ToResponse()`: Safely converts a `Category` to `*CategoryResponse`, returning `nil` if the receiver pointer is `nil`.
-- `ToCategoryResponseList(categories)`: Converts a slice of entities to response DTOs, guaranteeing a non-nil empty slice `[]CategoryResponse{}` so JSON encoders emit `[]` rather than `null`.
+##### `ToResponse()` Method
+
+```go
+func (c *Category) ToResponse() *CategoryResponse {
+    if c == nil {
+        return nil
+    }
+    return &CategoryResponse{
+        ID:        c.ID,
+        Name:      c.Name,
+        Icon:      c.Icon,
+        CreatedAt: c.CreatedAt,
+    }
+}
+```
+
+**Line-by-Line Breakdown:**
+- `func (c *Category) ToResponse() *CategoryResponse`: Pointer receiver method on `Category`. Using a pointer receiver avoids copying the struct on method invocation.
+- `if c == nil { return nil }`: Nil-safety guard preventing nil-pointer dereferences if invoked on a nil pointer.
+- `return &CategoryResponse{...}`: Allocates and returns a pointer to the DTO populated with category properties.
+
+##### `ToCategoryResponseList()` Function
+
+```go
+func ToCategoryResponseList(categories []Category) []CategoryResponse {
+    if len(categories) == 0 {
+        return []CategoryResponse{}
+    }
+    responses := make([]CategoryResponse, len(categories))
+    for i := range categories {
+        responses[i] = *categories[i].ToResponse()
+    }
+    return responses
+}
+```
+
+**Line-by-Line Breakdown:**
+- `if len(categories) == 0 { return []CategoryResponse{} }`: **Crucial JSON Guarantee!** If the slice is empty or nil, returns an empty allocated slice `[]CategoryResponse{}`. If we returned a nil slice, Go's `json.Marshal` would output `null`, which causes type errors in mobile JSON parsers (e.g., `Expected List<dynamic>, got Null`).
+- `responses := make([]CategoryResponse, len(categories))`: Pre-allocates slice capacity in one shot, avoiding dynamic memory reallocations during slice growth.
+- `for i := range categories`: Iterates by index and converts each category into a DTO.
 
 ---
 
@@ -2069,9 +2140,37 @@ Same error handling as GetUserByEmail.
 
 #### Purpose
 
-Handles database persistence and queries for the categories table using `DBTX`.
+Provides the persistence layer for item categories in PostgreSQL. It is the only package that executes category SQL queries, abstracting database operations behind a Go interface.
 
-#### Interface
+#### Line-by-Line Explanation
+
+```go
+package repository
+
+import (
+    "context"
+    "errors"
+    "fmt"
+
+    "github.com/MohammedaminSa/FindIt/backend/internal/models"
+    "github.com/jackc/pgx/v5"
+)
+```
+
+- `context`: Allows queries to respect HTTP request cancellation and database timeouts.
+- `errors`: Provides `errors.Is` and `errors.New` for domain-level error sentinel checks.
+- `pgx`: High-performance PostgreSQL driver used for `pgx.ErrNoRows`.
+
+##### Error Sentinel
+
+```go
+var (
+    ErrCategoryNotFound = errors.New("category not found")
+)
+```
+- Defines a domain-level error so calling services do not need to know about database-specific `pgx.ErrNoRows`.
+
+##### Interface Definition
 
 ```go
 type CategoryRepository interface {
@@ -2079,17 +2178,97 @@ type CategoryRepository interface {
     GetCategoryByID(ctx context.Context, id int64) (*models.Category, error)
 }
 ```
+- Decouples calling layers from SQL. In unit and integration tests, we can supply mock repositories without spinning up a live PostgreSQL instance.
 
-#### Key Methods
+##### Concrete Implementation & Constructor
 
-1. **`GetAllCategories(ctx)`**:
-   - Queries `SELECT id, name, icon, created_at FROM categories ORDER BY id ASC`.
-   - Iterates through `pgx.Rows`, scans into `models.Category`, and handles error checking (`rows.Err()`).
-   - Ensures an empty slice is returned when no rows are found.
+```go
+type PostgresCategoryRepository struct {
+    db DBTX
+}
 
-2. **`GetCategoryByID(ctx, id)`**:
-   - Executes parameterized query `WHERE id = $1`.
-   - Translates `pgx.ErrNoRows` into `ErrCategoryNotFound`.
+func NewCategoryRepository(db DBTX) *PostgresCategoryRepository {
+    return &PostgresCategoryRepository{db: db}
+}
+```
+- `db DBTX`: Uses our common database interface (which includes `Query`, `QueryRow`, `Exec`). This allows the repository to work with both a `*pgxpool.Pool` or a transaction `pgx.Tx`.
+
+##### `GetAllCategories` Method
+
+```go
+func (r *PostgresCategoryRepository) GetAllCategories(ctx context.Context) ([]models.Category, error) {
+    if r.db == nil {
+        return nil, ErrNilDatabase
+    }
+
+    query := `
+        SELECT id, name, icon, created_at
+        FROM categories
+        ORDER BY id ASC
+    `
+
+    rows, err := r.db.Query(ctx, query)
+    if err != nil {
+        return nil, fmt.Errorf("failed to query categories: %w", err)
+    }
+    defer rows.Close()
+
+    categories := make([]models.Category, 0)
+    for rows.Next() {
+        var cat models.Category
+        if err := rows.Scan(&cat.ID, &cat.Name, &cat.Icon, &cat.CreatedAt); err != nil {
+            return nil, fmt.Errorf("failed to scan category row: %w", err)
+        }
+        categories = append(categories, cat)
+    }
+
+    if err := rows.Err(); err != nil {
+        return nil, fmt.Errorf("rows iteration error: %w", err)
+    }
+
+    return categories, nil
+}
+```
+
+**Key Steps:**
+1. **Nil Guard:** Prevents nil pointer dereferences if the database pool wasn't initialized.
+2. **Explicit Columns:** Selects only the needed columns (`id`, `name`, `icon`, `created_at`), avoiding `SELECT *` which can break if schema columns are reordered.
+3. **Ordering:** `ORDER BY id ASC` ensures deterministic ordering across API calls.
+4. **`defer rows.Close()`:** Critical for connection pool health! Ensures the underlying database connection is returned to the pool after reading.
+5. **Iteration & Scanning:** Reads each row with `rows.Scan` into struct fields.
+6. **`rows.Err()` Check:** Verifies no network disconnect occurred midway through row iteration.
+
+##### `GetCategoryByID` Method
+
+```go
+func (r *PostgresCategoryRepository) GetCategoryByID(ctx context.Context, id int64) (*models.Category, error) {
+    if r.db == nil {
+        return nil, ErrNilDatabase
+    }
+
+    query := `
+        SELECT id, name, icon, created_at
+        FROM categories
+        WHERE id = $1
+    `
+
+    var cat models.Category
+    err := r.db.QueryRow(ctx, query, id).Scan(&cat.ID, &cat.Name, &cat.Icon, &cat.CreatedAt)
+    if err != nil {
+        if errors.Is(err, pgx.ErrNoRows) {
+            return nil, ErrCategoryNotFound
+        }
+        return nil, fmt.Errorf("failed to query category by id: %w", err)
+    }
+
+    return &cat, nil
+}
+```
+
+**Key Steps:**
+1. **Parameterized Query (`$1`):** Prevents SQL injection by passing `id` as a separate query parameter.
+2. **Single Row Optimization (`QueryRow`):** Executes and scans a single row directly.
+3. **Error Translation:** If PostgreSQL returns `pgx.ErrNoRows`, it translates it to `ErrCategoryNotFound`. Any other error is wrapped with `%w` for traceability.
 
 ---
 
@@ -2599,9 +2778,38 @@ func (s *DefaultAuthService) GetUserProfile(ctx context.Context, userID uuid.UUI
 
 #### Purpose
 
-Encapsulates business rules and validations for category operations.
+The business logic layer for categories. It coordinates category retrieval, enforces domain validation rules (such as validating category IDs before issuing database queries), and transforms internal database entities into external API DTOs.
 
-#### Interface
+#### Line-by-Line Explanation
+
+```go
+package service
+
+import (
+    "context"
+    "errors"
+
+    "github.com/MohammedaminSa/FindIt/backend/internal/models"
+    "github.com/MohammedaminSa/FindIt/backend/internal/repository"
+)
+```
+- `context`: Propagates timeouts and cancellation signals.
+- `errors`: Used to define domain-level error sentinels.
+- `models`: Gives access to `Category` and `CategoryResponse`.
+- `repository`: Gives access to `CategoryRepository` and `repository.ErrCategoryNotFound`.
+
+##### Error Sentinel Re-Exports & Definitions
+
+```go
+var (
+    ErrCategoryNotFound = repository.ErrCategoryNotFound
+    ErrInvalidCategoryID = errors.New("invalid category ID")
+)
+```
+- `ErrCategoryNotFound`: Aliased directly from the repository layer so callers importing `service` don't need to know or import `repository`.
+- `ErrInvalidCategoryID`: A business validation error returned when a client requests a category with an ID $\le 0$.
+
+##### Service Interface
 
 ```go
 type CategoryService interface {
@@ -2609,17 +2817,57 @@ type CategoryService interface {
     GetCategoryByID(ctx context.Context, id int64) (*models.CategoryResponse, error)
 }
 ```
+- Returns API-safe `models.CategoryResponse` DTOs instead of raw database entities.
 
-#### Key Methods
+##### Service Struct & Constructor
 
-1. **`GetAllCategories(ctx)`**:
-   - Calls repository `GetAllCategories(ctx)`.
-   - Maps raw database entities into public DTOs via `models.ToCategoryResponseList()`.
+```go
+type DefaultCategoryService struct {
+    categoryRepo repository.CategoryRepository
+}
 
-2. **`GetCategoryByID(ctx, id)`**:
-   - Validates that `id > 0`. If `id <= 0`, returns `ErrInvalidCategoryID` without hitting the database.
-   - Calls repository `GetCategoryByID(ctx, id)`.
-   - Converts the entity to a public `CategoryResponse`.
+func NewCategoryService(categoryRepo repository.CategoryRepository) *DefaultCategoryService {
+    return &DefaultCategoryService{
+        categoryRepo: categoryRepo,
+    }
+}
+```
+- **Dependency Injection:** Accepts the `CategoryRepository` interface, allowing fast in-memory mocking during unit tests without touching PostgreSQL.
+
+##### `GetAllCategories` Method
+
+```go
+func (s *DefaultCategoryService) GetAllCategories(ctx context.Context) ([]models.CategoryResponse, error) {
+    categories, err := s.categoryRepo.GetAllCategories(ctx)
+    if err != nil {
+        return nil, err
+    }
+
+    return models.ToCategoryResponseList(categories), nil
+}
+```
+- **Line 1:** Calls the repository to query PostgreSQL.
+- **Line 2-4:** If an error occurs (e.g. database pool error), returns `nil, err` to be handled by the HTTP handler.
+- **Line 5:** Uses `models.ToCategoryResponseList(categories)` to transform the entities into public DTOs, ensuring an empty non-nil slice `[]` if no categories exist.
+
+##### `GetCategoryByID` Method
+
+```go
+func (s *DefaultCategoryService) GetCategoryByID(ctx context.Context, id int64) (*models.CategoryResponse, error) {
+    if id <= 0 {
+        return nil, ErrInvalidCategoryID
+    }
+
+    cat, err := s.categoryRepo.GetCategoryByID(ctx, id)
+    if err != nil {
+        return nil, err
+    }
+
+    return cat.ToResponse(), nil
+}
+```
+- **Fast-Path Validation:** `if id <= 0`: Validates input before wasting database resources or connection pool time on impossible primary keys.
+- **Query & Transformation:** Fetches the category and transforms it via `cat.ToResponse()`. If the repository returns `ErrCategoryNotFound`, it bubbles cleanly up to the handler.
 
 ---
 
@@ -3136,28 +3384,120 @@ fmt.Println(userID.String())  // ✓ Works
 
 #### Purpose
 
-Handles incoming HTTP requests for category resources, registers routes under `/api/v1/categories`, validates path parameters, and formats JSON outputs.
+The HTTP controller for category endpoints. It binds and validates HTTP parameters, interacts with `CategoryService`, and serializes the domain response into clean JSON with appropriate HTTP status codes.
 
 #### Routes Registered
 
 | Method | Endpoint | Handler Method | Auth Required | Description |
-|--------|----------|----------------|---------------|-------------|
-| `GET` | `/api/v1/categories` | `GetAll` | No | Lists all categories |
-| `GET` | `/api/v1/categories/:id` | `GetByID` | No | Fetches a single category by ID |
+|---|---|---|---|---|
+| `GET` | `/api/v1/categories` | `GetAll` | No | Lists all active categories |
+| `GET` | `/api/v1/categories/:id` | `GetByID` | No | Fetches a single category by primary key ID |
 
-#### Key Methods
+#### Line-by-Line Explanation
 
-1. **`GetAll(c *gin.Context)`**:
-   - Calls `categoryService.GetAllCategories(c.Request.Context())`.
-   - On error: returns `500 Internal Server Error` with `{"error": "Failed to retrieve categories"}`.
-   - On success: returns `200 OK` with JSON array of categories.
+```go
+package handler
 
-2. **`GetByID(c *gin.Context)`**:
-   - Parses `:id` route parameter via `strconv.ParseInt(idStr, 10, 64)`.
-   - Rejects non-numeric or non-positive IDs with `400 Bad Request` (`{"error": "Invalid category ID"}`).
-   - Calls `categoryService.GetCategoryByID(...)`.
-   - Maps `ErrCategoryNotFound` to `404 Not Found` (`{"error": "Category not found"}`).
-   - On success: returns `200 OK` with the category object.
+import (
+    "errors"
+    "net/http"
+    "strconv"
+
+    "github.com/MohammedaminSa/FindIt/backend/internal/service"
+    "github.com/gin-gonic/gin"
+)
+```
+- `strconv`: Converts ASCII route parameter strings to integers (`ParseInt`).
+- `gin`: Provides `*gin.Context` for reading request params and writing JSON responses.
+
+##### Struct & Constructor
+
+```go
+type CategoryHandler struct {
+    categoryService service.CategoryService
+}
+
+func NewCategoryHandler(categoryService service.CategoryService) *CategoryHandler {
+    return &CategoryHandler{categoryService: categoryService}
+}
+```
+- Accepts the `CategoryService` interface, maintaining loose coupling and enabling isolated HTTP handler testing.
+
+##### `RegisterRoutes` Method
+
+```go
+func (h *CategoryHandler) RegisterRoutes(rg *gin.RouterGroup) {
+    categories := rg.Group("/categories")
+    {
+        categories.GET("", h.GetAll)
+        categories.GET("/:id", h.GetByID)
+    }
+}
+```
+- Attaches the `/categories` sub-group under the parent router group (typically `/api/v1`).
+- `categories.GET("", h.GetAll)` handles requests to `/api/v1/categories`.
+- `categories.GET("/:id", h.GetByID)` handles path-parameterized requests (e.g., `/api/v1/categories/1`).
+
+##### `GetAll` Method
+
+```go
+func (h *CategoryHandler) GetAll(c *gin.Context) {
+    categories, err := h.categoryService.GetAllCategories(c.Request.Context())
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "error": "Failed to retrieve categories",
+        })
+        return
+    }
+
+    c.JSON(http.StatusOK, categories)
+}
+```
+
+**Step-by-Step Breakdown:**
+1. `c.Request.Context()` passes the request context down through service to repository. If the user disconnects or the request times out, any in-flight database query is immediately cancelled.
+2. If `err != nil`, responds with `500 Internal Server Error` and a safe generic JSON error payload `{"error": "Failed to retrieve categories"}`.
+3. On success, responds with `200 OK` and the category DTO list `[{"id": 1, ...}]`.
+
+##### `GetByID` Method
+
+```go
+func (h *CategoryHandler) GetByID(c *gin.Context) {
+    idStr := c.Param("id")
+    id, err := strconv.ParseInt(idStr, 10, 64)
+    if err != nil || id <= 0 {
+        c.JSON(http.StatusBadRequest, gin.H{
+            "error": "Invalid category ID",
+        })
+        return
+    }
+
+    cat, err := h.categoryService.GetCategoryByID(c.Request.Context(), id)
+    if err != nil {
+        if errors.Is(err, service.ErrCategoryNotFound) {
+            c.JSON(http.StatusNotFound, gin.H{
+                "error": "Category not found",
+            })
+            return
+        }
+
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "error": "Failed to retrieve category",
+        })
+        return
+    }
+
+    c.JSON(http.StatusOK, cat)
+}
+```
+
+**Step-by-Step Breakdown:**
+1. **Route Parameter Extraction:** `c.Param("id")` extracts the value from the URL path.
+2. **Type Parsing & Validation:** `strconv.ParseInt(idStr, 10, 64)` parses base-10 64-bit integer. If the string contains letters (e.g. `"abc"`) or is $\le 0$, the request immediately returns `400 Bad Request` with `{"error": "Invalid category ID"}`.
+3. **Service Invocation:** Calls `h.categoryService.GetCategoryByID(ctx, id)`.
+4. **404 Mapping:** If `errors.Is(err, service.ErrCategoryNotFound)`, returns `404 Not Found` with `{"error": "Category not found"}`.
+5. **500 Fallback:** Any unexpected database failure returns `500 Internal Server Error`.
+6. **200 Success:** Returns `200 OK` with the category object.
 
 ---
 
