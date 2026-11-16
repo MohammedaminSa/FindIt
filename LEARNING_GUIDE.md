@@ -28,6 +28,7 @@ Welcome to the **FindIt** learning handbook! This document explains the core con
    - [Step 4.8: Verification & End-to-End API Testing](#step-48-verification--end-to-end-api-testing)
 4. [Phase 3: Core Domain Services (Lost & Found Features)](#4-phase-3-core-domain-services-lost--found-features)
    - [Step 5.1: Categories API & Domain Service](#step-51-categories-api--domain-service)
+   - [Step 5.2: Item Domain Models & Validation](#step-52-item-domain-models--validation)
 
 ---
 
@@ -367,5 +368,29 @@ flowchart LR
   cd backend
   go test -v ./internal/models/... ./internal/repository/... ./internal/service/... ./internal/handler/... ./cmd/api/...
   ```
+
+---
+
+### Step 5.2: Item Domain Models & Validation
+
+* **What is it?** The core domain data representation (`internal/models/item.go`) defining lost and found item models (`Item`), report payloads (`CreateItemRequest`), status lifecycle enums (`ItemType` = `LOST`/`FOUND`, `ItemStatus` = `ACTIVE`/`CLAIMED`/`RESOLVED`), and public DTOs (`ItemResponse`).
+* **Why do we use it?**
+  1. **Strict Type Safety & State Enums:** Replaces arbitrary strings with typed Go enums (`ItemType` and `ItemStatus`) equipped with `.IsValid()` checks to guarantee database constraint alignment at compile time and runtime.
+  2. **Comprehensive Domain Validation (`Validate()`):**
+     - Enforces title bounds (3-150 chars) and description lengths (5-2000 chars).
+     - Validates geographic coordinate boundaries: Latitude between `-90.0` and `+90.0`, Longitude between `-180.0` and `+180.0`.
+     - Rejects zero dates or incident dates in the distant future.
+     - Enforces a business limit of at most 5 images per listing.
+  3. **Safe DTO Projection (`ToResponse()` & `ToItemResponseList()`):**
+     - Guarantees nil image slices are serialized to empty JSON arrays `[]` instead of `null`, preventing null-pointer exceptions in mobile and frontend apps.
+     - Decouples raw internal database structures from public API contracts.
+* **Key Files:**
+  * `backend/internal/models/item.go`, `item_test.go`
+* **Verification:**
+  ```bash
+  cd backend
+  go test -v ./internal/models/...
+  ```
+
 
 

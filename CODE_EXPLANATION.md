@@ -16,6 +16,7 @@
 6. [Models Layer](#models-layer)
    - [User Models (`internal/models/user.go`)](#user-struct-database-model)
    - [Category Models (`internal/models/category.go`)](#category-models---internalmodelscategorygo)
+   - [Item Models (`internal/models/item.go`)](#item-models---internalmodelsitemgo)
 7. [Security Packages](#security-packages)
 8. [Repository Layer](#repository-layer)
    - [User Repository (`internal/repository/user_repository.go`)](#repository-layer)
@@ -1077,6 +1078,158 @@ func ToCategoryResponseList(categories []Category) []CategoryResponse {
 - `if len(categories) == 0 { return []CategoryResponse{} }`: **Crucial JSON Guarantee!** If the slice is empty or nil, returns an empty allocated slice `[]CategoryResponse{}`. If we returned a nil slice, Go's `json.Marshal` would output `null`, which causes type errors in mobile JSON parsers (e.g., `Expected List<dynamic>, got Null`).
 - `responses := make([]CategoryResponse, len(categories))`: Pre-allocates slice capacity in one shot, avoiding dynamic memory reallocations during slice growth.
 - `for i := range categories`: Iterates by index and converts each category into a DTO.
+
+### Item Models - `internal/models/item.go`
+
+#### Purpose
+
+Defines the central domain entities and input/output contracts for lost and found items. It specifies state machines (`ItemType`, `ItemStatus`), PostgreSQL schema mapping (`Item`), user submission payloads (`CreateItemRequest`), lifecycle transition payloads (`UpdateItemStatusRequest`), and clean JSON response representations (`ItemResponse`).
+
+#### Architecture Flow
+
+```
+Mobile/Web Request ➔ CreateItemRequest (Validation) ➔ Item (DB Model) ➔ PostgreSQL (items table) ➔ ItemResponse (Safe DTO) ➔ Flutter App
+```
+
+#### Line-by-Line Explanation
+
+```go
+package models
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+)
+```
+- `package models`: Belongs to the shared data models package.
+- `github.com/google/uuid`: Handles universally unique identifiers for item primary keys and user foreign keys.
+
+##### `ItemType` & `ItemStatus` Enums
+
+```go
+type ItemType string
+
+const (
+	ItemTypeLost  ItemType = "LOST"
+	ItemTypeFound ItemType = "FOUND"
+)
+
+func (t ItemType) IsValid() bool {
+	switch t {
+	case ItemTypeLost, ItemTypeFound:
+		return true
+	default:
+		return false
+	}
+}
+```
+
+**Why use Go string enums?**
+- Prevents invalid strings (like `"stolen"`, `"foundd"`, or empty strings) from entering business logic or database queries.
+- `IsValid()` provides a clean, single-point-of-truth boolean validator matching PostgreSQL `CHECK (type IN ('LOST', 'FOUND'))`.
+
+```go
+type ItemStatus string
+
+const (
+	ItemStatusActive   ItemStatus = "ACTIVE"
+	ItemStatusClaimed  ItemStatus = "CLAIMED"
+	ItemStatusResolved ItemStatus = "RESOLVED"
+)
+
+func (s ItemStatus) IsValid() bool {
+	switch s {
+	case ItemStatusActive, ItemStatusClaimed, ItemStatusResolved:
+		return true
+	default:
+		return false
+	}
+}
+```
+
+**Lifecycle Statuses Explained:**
+1. `ACTIVE`: Item is listed and open for search, discovery, and claim requests.
+2. `CLAIMED`: A claimant has submitted proof that was approved by the finder.
+3. `RESOLVED`: The item has been returned safely to its verified owner.
+
+##### `Item` Struct (Database Entity)
+
+```go
+type Item struct {
+	ID              uuid.UUID  `json:"id" db:"id"`
+	UserID          uuid.UUID  `json:"user_id" db:"user_id"`
+	Type            ItemType   `json:"type" db:"type"`
+	Title           string     `json:"title" db:"title"`
+	Description     string     `json:"description" db:"description"`
+	CategoryID      int64      `json:"category_id" db:"category_id"`
+	LocationName    string     `json:"location_name" db:"location_name"`
+	Latitude        *float64   `json:"latitude,omitempty" db:"latitude"`
+	Longitude       *float64   `json:"longitude,omitempty" db:"longitude"`
+	DateLostOrFound time.Time  `json:"date_lost_or_found" db:"date_lost_or_found"`
+	Status          ItemStatus `json:"status" db:"status"`
+	ImageURLs       []string   `json:"image_urls" db:"image_urls"`
+	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at" db:"updated_at"`
+}
+```
+
+**Key Fields Explained:**
+- `Latitude` & `Longitude` (`*float64`): Pointers allow `nil` values when a user reports an approximate location without exact GPS coordinates.
+- `ImageURLs` (`[]string`): Mapped to PostgreSQL `TEXT[]` array, storing relative URLs (e.g., `["/uploads/uuid.jpg"]`).
+
+##### `CreateItemRequest` & Validation
+
+```go
+type CreateItemRequest struct {
+	Type            ItemType  `json:"type" form:"type" binding:"required"`
+	Title           string    `json:"title" form:"title" binding:"required,min=3,max=150"`
+	Description     string    `json:"description" form:"description" binding:"required,min=5,max=2000"`
+	CategoryID      int64     `json:"category_id" form:"category_id" binding:"required,gt=0"`
+	LocationName    string    `json:"location_name" form:"location_name" binding:"required,min=2,max=255"`
+	Latitude        *float64  `json:"latitude,omitempty" form:"latitude"`
+	Longitude       *float64  `json:"longitude,omitempty" form:"longitude"`
+	DateLostOrFound time.Time `json:"date_lost_or_found" form:"date_lost_or_found" binding:"required"`
+	ImageURLs       []string  `json:"image_urls,omitempty" form:"image_urls"`
+}
+```
+
+**`Validate()` Method:**
+- Checks type validity (`LOST` or `FOUND`).
+- Strips whitespace and enforces bounds on title (3-150 chars), description (5-2000 chars), and location (2-255 chars).
+- Verifies `CategoryID > 0`.
+- Validates GPS ranges: `-90.0 <= Latitude <= +90.0` and `-180.0 <= Longitude <= +180.0`.
+- Guards against impossible dates in the future.
+- Enforces a maximum limit of 5 photos per reported item.
+
+##### `ItemResponse` Struct & Helpers
+
+```go
+type ItemResponse struct {
+	ID              uuid.UUID         `json:"id"`
+	UserID          uuid.UUID         `json:"user_id"`
+	Type            ItemType          `json:"type"`
+	Title           string            `json:"title"`
+	Description     string            `json:"description"`
+	CategoryID      int64             `json:"category_id"`
+	Category        *CategoryResponse `json:"category,omitempty"`
+	LocationName    string            `json:"location_name"`
+	Latitude        *float64          `json:"latitude,omitempty"`
+	Longitude       *float64          `json:"longitude,omitempty"`
+	DateLostOrFound time.Time         `json:"date_lost_or_found"`
+	Status          ItemStatus        `json:"status"`
+	ImageURLs       []string          `json:"image_urls"`
+	CreatedAt       time.Time         `json:"created_at"`
+	UpdatedAt       time.Time         `json:"updated_at"`
+}
+```
+
+- `ToResponse()` ensures `ImageURLs` is never `nil` (always `[]string{}`) so mobile clients receive `[]` instead of `null`.
+- `ToItemResponseList()` provides safe batch conversion for listing feeds.
 
 ---
 
