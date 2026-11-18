@@ -24,9 +24,11 @@
 9. [Service Layer](#service-layer)
    - [Auth Service (`internal/service/auth_service.go`)](#service-layer)
    - [Category Service (`internal/service/category_service.go`)](#category-service---internalservicecategory_servicego)
+   - [Upload Service (`internal/service/upload_service.go`)](#upload-service---internalserviceupload_servicego)
 10. [Handler Layer](#handler-layer)
     - [Auth Handler (`internal/handler/auth.go`)](#handler-layer)
     - [Category Handler (`internal/handler/category.go`)](#category-handler---internalhandlercategorygo)
+    - [Upload Handler (`internal/handler/upload.go`)](#upload-handler---internalhandleruploadgo)
 11. [Middleware Layer](#middleware-layer)
 12. [Main Application](#main-application)
 13. [Testing Explained](#testing-explained)
@@ -3024,6 +3026,34 @@ func (s *DefaultCategoryService) GetCategoryByID(ctx context.Context, id int64) 
 
 ---
 
+### Upload Service - `internal/service/upload_service.go`
+
+#### Purpose
+Provides secure media validation, unique UUID-based persistence, batch upload processing, and file lifecycle management (including safe deletion and directory traversal protection) for photos uploaded for lost and found items.
+
+#### Architecture Flow
+```
+Client Multipart Request ➔ Sniff First 512 Magic Bytes ➔ Enforce MIME Type & Size ➔ Rewind Reader ➔ Write UUID File to Disk ➔ Return Relative URL ("/uploads/<uuid>.<ext>")
+```
+
+#### Key Capabilities & Security Controls
+1. **Magic Bytes Content Sniffing:**
+   - Rather than blindly relying on the client's `Content-Type` header or file extension (which attackers can easily spoof), the service reads the first 512 bytes of the payload and analyzes magic byte signatures using `http.DetectContentType` combined with custom WebP `RIFF....WEBP` container inspection.
+   - Only `image/jpeg`, `image/png`, and `image/webp` are permitted.
+2. **File Size Hard Limit:**
+   - Enforces a 5MB limit (`DefaultMaxFileSize = 5 * 1024 * 1024`).
+   - Uses `io.LimitReader` during disk writes to terminate immediately if the byte count exceeds the threshold, preventing disk-exhaustion denial-of-service attacks.
+3. **Random UUID Filenames:**
+   - Overwrites client-supplied filenames with RFC 4122 v4 UUIDs (e.g. `9f3c713b-24b9-4921-a477-9df03399cfc1.jpg`), neutralizing directory traversal, HTML injection, and arbitrary file overwrite vulnerabilities.
+4. **Atomic Batch Uploads:**
+   - Supports uploading up to 5 images in a single call (aligned with item model bounds).
+   - Validates all files prior to writing any bytes to disk.
+   - If an unexpected I/O error occurs midway through writing files, all previously created files in that batch are cleaned up (rollback).
+5. **Path Traversal Defense in Deletion:**
+   - Cleans input paths and extracts strictly the base filename via `filepath.Base`, forbidding `..`, slashes, or attempts to delete files outside the configured upload directory.
+
+---
+
 ## Handler Layer
 
 **File:** `internal/handler/auth.go`
@@ -3651,6 +3681,30 @@ func (h *CategoryHandler) GetByID(c *gin.Context) {
 4. **404 Mapping:** If `errors.Is(err, service.ErrCategoryNotFound)`, returns `404 Not Found` with `{"error": "Category not found"}`.
 5. **500 Fallback:** Any unexpected database failure returns `500 Internal Server Error`.
 6. **200 Success:** Returns `200 OK` with the category object.
+
+---
+
+### Upload Handler - `internal/handler/upload.go`
+
+#### Purpose
+The HTTP presentation controller for media uploads and asset deletion. It parses multipart requests, binds individual or batch files, maps business domain errors to standard HTTP response codes, and registers media endpoints protected by JWT authentication.
+
+#### Endpoints Managed
+- `POST /api/v1/uploads`: Accepts single or multiple images via multipart fields (`"image"`, `"images"`, or `"file"`). Returns `201 Created` with relative image URLs.
+- `POST /api/v1/upload`: Alias route for single-file uploads.
+- `POST /api/v1/uploads/multiple`: Dedicated explicit batch upload endpoint.
+- `DELETE /api/v1/uploads/:filename`: Removes an uploaded image by filename.
+
+#### HTTP Error Status Mapping
+| Domain Service Error | HTTP Status Code | Response Body Message |
+|----------------------|------------------|------------------------|
+| `ErrEmptyFile` | `400 Bad Request` | `"Uploaded file is empty"` |
+| `ErrFileTooLarge` | `400 Bad Request` | `"File size exceeds the 5MB limit"` |
+| `ErrInvalidFileType` | `400 Bad Request` | `"Unsupported file format. Only JPEG, PNG, and WebP images are allowed"` |
+| `ErrTooManyFiles` | `400 Bad Request` | `"Maximum 5 images allowed per upload"` |
+| `ErrInvalidFileName` | `400 Bad Request` | `"Invalid file name"` |
+| `ErrFileNotFound` | `404 Not Found` | `"Image not found"` |
+| Unknown / I/O Error | `500 Internal Server Error` | `"Failed to process image upload"` |
 
 ---
 

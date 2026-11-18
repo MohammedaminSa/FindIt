@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -18,7 +20,7 @@ func init() {
 }
 
 func TestSetupRouter_HealthEndpoint(t *testing.T) {
-	router := setupRouter(nil, nil, nil)
+	router := setupRouter(nil, nil, nil, nil, "")
 
 	req, err := http.NewRequest(http.MethodGet, "/api/v1/health", nil)
 	if err != nil {
@@ -53,7 +55,7 @@ func TestSetupRouter_AuthEndpointsMounted(t *testing.T) {
 	}
 	authMw := middleware.Auth(jwtMgr)
 	authHandler := handler.NewAuthHandler(nil)
-	router := setupRouter(nil, authHandler, nil, authMw)
+	router := setupRouter(nil, authHandler, nil, nil, "", authMw)
 
 	// Test that /api/v1/auth/register responds (not 404)
 	reqReg, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/register", nil)
@@ -85,7 +87,7 @@ func TestSetupRouter_AuthEndpointsMounted(t *testing.T) {
 
 func TestSetupRouter_CategoryEndpointsMounted(t *testing.T) {
 	categoryHandler := handler.NewCategoryHandler(nil)
-	router := setupRouter(nil, nil, categoryHandler)
+	router := setupRouter(nil, nil, categoryHandler, nil, "")
 
 	// Test that /api/v1/categories is mounted (not 404)
 	reqCategories, _ := http.NewRequest(http.MethodGet, "/api/v1/categories", nil)
@@ -94,5 +96,51 @@ func TestSetupRouter_CategoryEndpointsMounted(t *testing.T) {
 
 	if wCategories.Code == http.StatusNotFound {
 		t.Errorf("expected /api/v1/categories to be mounted, got 404")
+	}
+}
+
+func TestSetupRouter_UploadEndpointsMounted(t *testing.T) {
+	uploadHandler := handler.NewUploadHandler(nil)
+	router := setupRouter(nil, nil, nil, uploadHandler, "")
+
+	// Test that /api/v1/uploads responds (not 404)
+	reqUploads, _ := http.NewRequest(http.MethodPost, "/api/v1/uploads", nil)
+	wUploads := httptest.NewRecorder()
+	router.ServeHTTP(wUploads, reqUploads)
+
+	if wUploads.Code == http.StatusNotFound {
+		t.Errorf("expected /api/v1/uploads to be mounted, got 404")
+	}
+
+	// Test alias /api/v1/upload responds (not 404)
+	reqUpload, _ := http.NewRequest(http.MethodPost, "/api/v1/upload", nil)
+	wUpload := httptest.NewRecorder()
+	router.ServeHTTP(wUpload, reqUpload)
+
+	if wUpload.Code == http.StatusNotFound {
+		t.Errorf("expected /api/v1/upload to be mounted, got 404")
+	}
+}
+
+func TestSetupRouter_StaticUploadsServed(t *testing.T) {
+	tempDir := t.TempDir()
+	testFileName := "test-image.jpg"
+	testContent := []byte("fake-image-bytes")
+	if err := os.WriteFile(filepath.Join(tempDir, testFileName), testContent, 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	router := setupRouter(nil, nil, nil, nil, tempDir)
+
+	req, _ := http.NewRequest(http.MethodGet, "/uploads/"+testFileName, nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected HTTP 200 for static file, got %d", w.Code)
+	}
+
+	if w.Body.String() != string(testContent) {
+		t.Errorf("expected body '%s', got '%s'", string(testContent), w.Body.String())
 	}
 }

@@ -24,7 +24,7 @@ This document tracks every phase, step, sub-step, and task required to build **F
   - [ ] Step 5: Category & Item Reporting APIs (Image Uploads & Location)
     - [x] Step 5.1: Categories API (`GET /api/v1/categories`)
     - [x] Step 5.2: Item Domain Models (`internal/models/item.go`)
-    - [ ] Step 5.3: Image Upload Service (`internal/service/upload_service.go`)
+    - [x] Step 5.3: Image Upload Service (`internal/service/upload_service.go`)
     - [ ] Step 5.4: Item Repository & Service (`internal/repository/item_repository.go`, `internal/service/item_service.go`)
     - [ ] Step 5.5: Item Endpoints (`POST /api/v1/items`, `GET /api/v1/items/:id`)
   - [ ] Step 6: Search & Filtering Engine (PostgreSQL Full-Text Search)
@@ -155,9 +155,11 @@ This document tracks every phase, step, sub-step, and task required to build **F
     - End-to-end integration tests (`cmd/api/category_integration_test.go`)
   - [x] **Step 5.2: Item Domain Models (`internal/models/item.go`)**
     - Define `Item`, `CreateItemRequest`, `ItemResponse`, status/type enums.
-  - [ ] **Step 5.3: Image Upload Service (`internal/service/upload_service.go`)**
+  - [x] **Step 5.3: Image Upload Service (`internal/service/upload_service.go`)**
     - Validate file size and MIME types (JPEG, PNG, WebP).
     - Store files with unique UUID filenames in `uploads/` and serve statically.
+    - Media handler (`POST /api/v1/uploads`, `DELETE /api/v1/uploads/:filename`) and static route `/uploads/*`.
+    - Comprehensive unit and end-to-end integration tests (`upload_service_test.go`, `upload_test.go`, `upload_integration_test.go`).
   - [ ] **Step 5.4: Item Repository & Service (`internal/repository/item_repository.go`, `internal/service/item_service.go`)**
     - SQL queries: `CreateItem`, `GetItemByID`, `UpdateItemStatus`.
   - [ ] **Step 5.5: Item Endpoints (`POST /api/v1/items`, `GET /api/v1/items/:id`)**

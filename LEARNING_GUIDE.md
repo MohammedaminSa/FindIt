@@ -392,5 +392,36 @@ flowchart LR
   go test -v ./internal/models/...
   ```
 
+---
+
+### Step 5.3: Image Upload Service & Static Asset Serving
+
+* **What is it?** A secure file upload pipeline (`internal/service/upload_service.go`, `internal/handler/upload.go`) validating image formats, size boundaries, and disk persistence, integrated with static file serving (`/uploads/*`) in the Gin API router.
+* **Why do we use it?**
+  1. **Magic Bytes MIME Sniffing:**
+     - Avoids trusting spoofable HTTP headers or extensions.
+     - Inspects the first 512 bytes with `http.DetectContentType` and custom WebP signature matching (`RIFF....WEBP`).
+     - Strictly permits JPEG, PNG, and WebP images.
+  2. **Security & DoS Protection:**
+     - Enforces a 5MB per-file boundary using `io.LimitReader` to prevent disk saturation.
+     - Generates RFC 4122 v4 UUID filenames to prevent path traversal, HTML injection, and file collisions.
+     - Sanitizes filenames in deletion requests to prevent escaping the upload root.
+  3. **Atomic Multi-Image Batch Uploads:**
+     - Aligns with the 5-photo domain limit per item.
+     - Pre-validates all files prior to disk writes; rolls back any written files if an unexpected error occurs.
+  4. **Static Route Serving:**
+     - Mounts `router.Static("/uploads", uploadDir)` in Gin so uploaded media is immediately accessible to web and Flutter clients.
+* **Key Files:**
+  * `backend/internal/service/upload_service.go`, `upload_service_test.go`
+  * `backend/internal/handler/upload.go`, `upload_test.go`
+  * `backend/cmd/api/upload_integration_test.go`
+  * `backend/cmd/api/main.go`, `main_test.go`
+  * `backend/internal/config/config.go`, `config_test.go`
+* **Verification:**
+  ```bash
+  cd backend
+  go test -v ./internal/service/... ./internal/handler/... ./cmd/api/...
+  ```
+
 
 

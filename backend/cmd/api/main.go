@@ -22,14 +22,26 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// setupRouter initializes the Gin engine with all global middlewares and v1 API routes.
-func setupRouter(db handler.Pinger, authHandler *handler.AuthHandler, categoryHandler *handler.CategoryHandler, authMiddleware ...gin.HandlerFunc) *gin.Engine {
+// setupRouter initializes the Gin engine with all global middlewares, static assets, and v1 API routes.
+func setupRouter(
+	db handler.Pinger,
+	authHandler *handler.AuthHandler,
+	categoryHandler *handler.CategoryHandler,
+	uploadHandler *handler.UploadHandler,
+	uploadDir string,
+	authMiddleware ...gin.HandlerFunc,
+) *gin.Engine {
 	router := gin.New()
 
 	// Global Middlewares
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
 	router.Use(middleware.CORS())
+
+	// Static File Serving for Uploaded Assets
+	if uploadDir != "" {
+		router.Static("/uploads", uploadDir)
+	}
 
 	// Handlers
 	healthHandler := handler.NewHealthHandler(db)
@@ -48,6 +60,9 @@ func setupRouter(db handler.Pinger, authHandler *handler.AuthHandler, categoryHa
 		}
 		if categoryHandler != nil {
 			categoryHandler.RegisterRoutes(v1)
+		}
+		if uploadHandler != nil {
+			uploadHandler.RegisterRoutes(v1, authMw)
 		}
 	}
 
@@ -98,7 +113,13 @@ func main() {
 	categoryService := service.NewCategoryService(categoryRepo)
 	categoryHandler := handler.NewCategoryHandler(categoryService)
 
-	router := setupRouter(pinger, authHandler, categoryHandler, authMiddleware)
+	if err := os.MkdirAll(cfg.UploadDir, 0755); err != nil {
+		log.Printf("Warning: failed to create upload directory %s: %v", cfg.UploadDir, err)
+	}
+	uploadService := service.NewUploadService(cfg.UploadDir, cfg.MaxUploadSize)
+	uploadHandler := handler.NewUploadHandler(uploadService)
+
+	router := setupRouter(pinger, authHandler, categoryHandler, uploadHandler, cfg.UploadDir, authMiddleware)
 
 	// 4. Configure HTTP server with production-ready timeouts
 	serverAddr := fmt.Sprintf(":%s", cfg.ServerPort)

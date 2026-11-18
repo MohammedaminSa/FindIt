@@ -24,6 +24,14 @@ func TestConfigLoadDefaults(t *testing.T) {
 		t.Errorf("Expected ServerPort to have default value, got empty")
 	}
 
+	if cfg.UploadDir != "uploads" {
+		t.Errorf("Expected UploadDir to default to 'uploads', got '%s'", cfg.UploadDir)
+	}
+
+	if cfg.MaxUploadSize != 5*1024*1024 {
+		t.Errorf("Expected MaxUploadSize to default to 5MB, got %d", cfg.MaxUploadSize)
+	}
+
 	expectedDSNPrefix := "postgres://"
 	if len(cfg.DatabaseURL()) < len(expectedDSNPrefix) || cfg.DatabaseURL()[:len(expectedDSNPrefix)] != expectedDSNPrefix {
 		t.Errorf("DatabaseURL() should start with %s, got %s", expectedDSNPrefix, cfg.DatabaseURL())

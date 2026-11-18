@@ -64,7 +64,7 @@ func TestCategoryAPI_Integration(t *testing.T) {
 	repo := newInMemoryCategoryRepo()
 	svc := service.NewCategoryService(repo)
 	catHandler := handler.NewCategoryHandler(svc)
-	router := setupRouter(nil, nil, catHandler)
+	router := setupRouter(nil, nil, catHandler, nil, "")
 
 	t.Run("GET /api/v1/categories - list all default categories", func(t *testing.T) {
 		req, err := http.NewRequest(http.MethodGet, "/api/v1/categories", nil)

@@ -28,6 +28,10 @@ type Config struct {
 	ServerPort  string
 	Environment string
 	JWTSecret   string
+
+	// Media & File Upload Settings
+	UploadDir     string
+	MaxUploadSize int64
 }
 
 // Load reads settings from .env file and environment variables.
@@ -49,6 +53,8 @@ func Load() (*Config, error) {
 		ServerPort:        getEnv("SERVER_PORT", "8080"),
 		Environment:       getEnv("ENVIRONMENT", "development"),
 		JWTSecret:         getEnv("JWT_SECRET", "default_secret_key_change_in_production"),
+		UploadDir:         getEnv("UPLOAD_DIR", "uploads"),
+		MaxUploadSize:     int64(getEnvAsInt("MAX_UPLOAD_SIZE_BYTES", 5*1024*1024)),
 	}
 
 	return cfg, nil
